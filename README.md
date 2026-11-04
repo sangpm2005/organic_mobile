@@ -100,6 +100,8 @@ flutter test
 
 ## Làm việc nhóm
 
+Repo công khai cho phép mọi thành viên clone. Thành viên đã được chủ repo thêm làm collaborator có thể đẩy nhánh trực tiếp; nếu chưa có quyền ghi, fork repo và mở pull request từ fork.
+
 Tạo nhánh riêng cho từng việc, ví dụ `git switch -c feature/customer-push`, commit rồi mở pull request về `main`. Trước khi bắt đầu việc mới, cập nhật `main` bằng `git pull --ff-only`. Tránh thay `pubspec.lock` hoặc format hàng loạt khi không liên quan tới công việc.
 
 Font Be Vietnam Pro và Lora kèm giấy phép trong `assets/fonts/*-OFL.txt`. Các file cấu hình máy, khóa ký, build, dữ liệu và log local đã được loại khỏi Git.
