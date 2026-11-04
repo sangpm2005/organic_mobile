@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
 import 'package:organic_mobile/main.dart' as app;
-import 'package:organic_mobile/core/models.dart';
+import 'package:organic_mobile/app/organic_app.dart';
+import 'package:organic_mobile/core/utils/json.dart';
 
 const bridge = String.fromEnvironment('UAT_BRIDGE');
 const token = String.fromEnvironment('UAT_TOKEN');
@@ -127,7 +128,7 @@ void main() {
     final f = object(await control('/fixture'));
     await app.main();
     await t.pump(const Duration(seconds: 2));
-    final store = t.widget<app.OrganicApp>(find.byType(app.OrganicApp)).store;
+    final store = t.widget<OrganicApp>(find.byType(OrganicApp)).store;
     bool surfaceConverted = false;
     Future<void> shot(String name) async {
       if (!surfaceConverted) {
