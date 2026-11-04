@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:organic_mobile/app/state/organic_store.dart';
-import 'package:organic_mobile/core/network/api_exception.dart';
 import 'package:organic_mobile/core/utils/formatters.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/auth/presentation/widgets/login_gate.dart';
@@ -16,7 +15,8 @@ import 'widgets/shipment_card.dart';
 
 import 'package:organic_mobile/shared/widgets/empty_state.dart';
 import 'package:organic_mobile/shared/widgets/panel.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'payment_launcher.dart';
 
 import '../../catalog/presentation/widgets/product_photo.dart';
 import '../domain/payment_policy.dart';
@@ -38,6 +38,8 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   Timer? timer;
   bool loading = false, busy = false;
   bool active = true;
+  Future<void>? _loadPending;
+  String? actionError;
   @override
   void initState() {
     super.initState();
@@ -62,14 +64,31 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> load() async {
-    if (!active || loading || store == null || !store!.loggedIn) {
+  Future<void> load({bool force = false}) async {
+    if (!active || store == null || !store!.loggedIn) {
       return;
     }
+    final pending = _loadPending;
+    if (pending != null) {
+      await pending;
+      if (force && mounted) await load();
+      return;
+    }
+    final request = fetchOrder();
+    _loadPending = request;
+    try {
+      await request;
+    } finally {
+      if (identical(_loadPending, request)) _loadPending = null;
+    }
+  }
+
+  Future<void> fetchOrder() async {
+    final account = store!.user?['accountId'];
     loading = true;
     try {
       final result = await store!.orderService.detail(widget.id);
-      if (mounted) {
+      if (mounted && store!.loggedIn && store!.user?['accountId'] == account) {
         setState(() {
           order = result;
           error = null;
@@ -85,36 +104,58 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   }
 
   Future<void> cancel() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hủy đơn hàng?'),
-        content: const Text(
-          'Đơn sẽ được hủy theo điều kiện hiện tại của cửa hàng. Hàng và điểm đang giữ sẽ được giải phóng.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Giữ đơn'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hủy đơn'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) {
-      return;
-    }
-    setState(() => busy = true);
+    if (busy || order == null || !canCancelOrder(order!)) return;
+    setState(() {
+      busy = true;
+      actionError = null;
+    });
     try {
-      await store!.orderService.cancel(widget.id);
-      await load();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Hủy đơn hàng?'),
+          content: const Text(
+            'Đơn sẽ được hủy theo điều kiện hiện tại của cửa hàng. Hàng và điểm đang giữ sẽ được giải phóng.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Giữ đơn'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Hủy đơn'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) {
+        return;
+      }
+      await load(force: true);
+      if (!mounted || order == null || !canCancelOrder(order!)) return;
+      final creating = objects(order!['payments'])
+          .where(
+            (payment) =>
+                payment['gateway'] == order!['paymentMethod'] &&
+                payment['status'] == 'creating',
+          )
+          .firstOrNull;
+      final due = DateTime.tryParse('${order!['paymentDueAt']}');
+      if (creating != null && due != null && due.isAfter(DateTime.now())) {
+        // Recover the existing attempt using the API's persisted reference;
+        // the cancellation endpoint can then close that payment normally.
+        await store!.orderService.initiate(widget.id, '${creating['gateway']}');
+      }
+      final cancelled = await store!.orderService.cancel(widget.id);
+      if (mounted && cancelled['id'] == widget.id) {
+        setState(() => order = cancelled);
+      }
+      await load(force: true);
       await store!.refreshAccount(force: true);
     } catch (e) {
       if (mounted) {
-        toast(context, e);
+        setState(() => actionError = '$e');
       }
     } finally {
       if (mounted) {
@@ -124,20 +165,22 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   }
 
   Future<void> pay() async {
-    setState(() => busy = true);
+    if (busy || order == null || !canPayOrder(order!)) return;
+    setState(() {
+      busy = true;
+      actionError = null;
+    });
     try {
       final payment = await store!.orderService.initiate(
         widget.id,
         '${order!['paymentMethod']}',
       );
-      await load();
-      final url = paymentRedirect(payment);
-      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        throw const ApiException('Chưa mở được cổng thanh toán.');
-      }
+      await load(force: true);
+      if (!mounted || !store!.loggedIn) return;
+      await openPaymentPortal(payment);
     } catch (e) {
       if (mounted) {
-        toast(context, e);
+        setState(() => actionError = '$e');
       }
     } finally {
       if (mounted) {
@@ -147,31 +190,35 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   }
 
   Future<void> verifyPayment() async {
+    if (busy) return;
     final paypal = order?['paymentMethod'] == 'paypal';
-    if (paypal) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Xác nhận thanh toán PayPal'),
-          content: const Text(
-            'Bạn đã chấp thuận thanh toán trên PayPal? Ứng dụng sẽ yêu cầu máy chủ kiểm tra và hoàn tất thu tiền nếu giao dịch đã được chấp thuận.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Chưa'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Đã chấp thuận'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-    }
-    setState(() => busy = true);
+    setState(() {
+      busy = true;
+      actionError = null;
+    });
     try {
+      if (paypal) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Xác nhận thanh toán PayPal'),
+            content: const Text(
+              'Bạn đã chấp thuận thanh toán trên PayPal? Ứng dụng sẽ yêu cầu máy chủ kiểm tra và hoàn tất thu tiền nếu giao dịch đã được chấp thuận.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Chưa'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Đã chấp thuận'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
       final latest = await store!.orderService.detail(widget.id);
       final payment = objects(latest['payments'])
           .where(
@@ -187,11 +234,13 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
           .firstOrNull;
       if (payment != null && latest['paymentStatus'] != 'paid') {
         final checked = await store!.orderService.sync('${payment['id']}');
-        if (paypal && ['pending', 'capturing'].contains(checked['status'])) {
+        if (paypal &&
+            checked['gateway'] == 'paypal' &&
+            ['pending', 'capturing'].contains(checked['status'])) {
           await store!.orderService.capturePaypal('${payment['id']}');
         }
       }
-      await load();
+      await load(force: true);
       await store!.refreshAccount(force: true);
       if (mounted) {
         toast(
@@ -202,7 +251,7 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
         );
       }
     } catch (e) {
-      if (mounted) toast(context, e);
+      if (mounted) setState(() => actionError = '$e');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -311,7 +360,9 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                   const Divider(),
                   PriceSummary(object(order!['pricing'])),
                   Text(
-                    '${order!['paymentMethod']}'.toUpperCase() +
+                    (order!['paymentMethod'] == 'payos'
+                            ? 'VietQR'
+                            : '${order!['paymentMethod']}'.toUpperCase()) +
                         (order!['paymentStatus'] == 'paid'
                             ? ' · Đã thanh toán'
                             : ' · ${orderStatus(order!['paymentStatus'])}'),
@@ -323,13 +374,27 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                     'Điểm đã tích: ${order!['pointsEarned'] ?? 0}',
                     style: const TextStyle(color: moss),
                   ),
-                  if (order!['paymentMethod'] != 'cod' &&
-                      order!['paymentStatus'] != 'paid') ...[
+                  if (actionError != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        actionError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  if (canPayOrder(order!) &&
+                      order!['paymentMethod'] != 'cod') ...[
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: busy ? null : verifyPayment,
                       icon: const Icon(Icons.verified_outlined),
-                      label: const Text('Đã thanh toán / Kiểm tra kết quả'),
+                      label: Text(
+                        order!['paymentMethod'] == 'paypal'
+                            ? 'Xác nhận thanh toán PayPal'
+                            : 'Kiểm tra thanh toán',
+                      ),
                     ),
                   ],
                   if (order!['paymentDueAt'] != null &&
@@ -340,7 +405,13 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: busy ? null : pay,
-                      child: const Text('Tiếp tục thanh toán'),
+                      child: Text(
+                        order!['paymentMethod'] == 'payos'
+                            ? 'Hiện mã VietQR'
+                            : order!['paymentMethod'] == 'paypal'
+                            ? 'Thanh toán PayPal'
+                            : 'Tiếp tục thanh toán',
+                      ),
                     ),
                   ],
                   if (canCancelOrder(order!)) ...[

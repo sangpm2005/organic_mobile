@@ -25,7 +25,7 @@ flutter run -d <ANDROID_DEVICE_ID>
 
 Thay `<ANDROID_DEVICE_ID>` bằng ID từ `flutter devices`, ví dụ `emulator-5554`.
 
-Nếu Android Emulator bị crash ở luồng `raster` với `bad_alloc` hoặc báo texture tối đa `0 × 0`, thử chọn **Organic Android Emulator** trong danh sách cấu hình Run của IntelliJ, chọn thiết bị Android rồi bấm Run. Cấu hình trong `.run/Organic_Android_Emulator.run.xml` dùng `--no-enable-impeller --enable-software-rendering` để tránh bộ vẽ GPU đang lỗi trên máy ảo với Flutter 3.47.7. Chế độ này có thể chậm hơn; thiết bị thật dùng cấu hình `main.dart` thông thường.
+Nếu Android Emulator bị crash ở luồng `raster` với `bad_alloc` hoặc báo texture tối đa `0 × 0`, thử chọn **Organic Android Emulator** trong danh sách cấu hình Run của IntelliJ, chọn thiết bị Android rồi bấm Run. Cấu hình trong `.run/Organic_Android_Emulator.run.xml` dùng `--no-enable-impeller --enable-software-rendering` để tránh bộ vẽ GPU đang lỗi trên máy ảo với Flutter 3.47.7. Chế độ này có thể chậm hơn; thiết bị thật kết nối backend qua USB dùng cấu hình **Organic Android USB** bên dưới.
 
 Nếu cả màn hình Android cũng đen hoặc không phản hồi, tắt máy ảo và khởi động lại với Software Graphics, giữ nguyên dữ liệu:
 
@@ -43,6 +43,10 @@ flutter run -d <ANDROID_DEVICE_ID> --dart-define=API_BASE_URL=https://YOUR_BACKE
 
 App chỉ cho phép tài khoản **CUSTOMER**. Tạo tài khoản qua OTP hoặc dùng tài khoản phát triển do nhóm cung cấp. SendGrid, Cloudinary, JWT và các khóa thanh toán nằm phía backend; không đưa vào Dart, assets hoặc `--dart-define`.
 
+Mobile có đăng nhập và liên kết Google qua API sẵn có. Xem [cấu hình OAuth Android/iOS](docs/google-sign-in.md); Web Client ID của backend chưa thay thế đăng ký package/SHA-1 cho Android.
+
+VietQR và PayPal là hai lựa chọn riêng trong bước đặt hàng. VietQR mở trang QR của payOS bằng trình duyệt trong ứng dụng (hoặc trình duyệt ngoài nếu thiết bị không hỗ trợ); PayPal mở trang chấp thuận PayPal riêng. Mobile dùng đường dẫn thanh toán API trả về, không tự tạo mã chuyển khoản hoặc tự đánh dấu đã thu tiền. Khi hủy đơn, app giữ nguyên lỗi API để người dùng đọc và chỉ cập nhật thành đã hủy sau phản hồi thành công từ máy chủ.
+
 ### Điện thoại Android thật qua USB
 
 Bật Developer options và USB debugging trên điện thoại, dùng cáp có truyền dữ liệu, rồi chấp thuận hộp thoại cho phép gỡ lỗi USB. Backend vẫn chạy trên máy tính ở cổng 8088. Trong PowerShell:
@@ -53,6 +57,16 @@ Bật Developer options và USB debugging trên điện thoại, dùng cáp có 
 ```
 
 Thay `ID_DIEN_THOAI` bằng serial thật từ lệnh đầu, không chọn `emulator-5554`. Trong IntelliJ chọn cấu hình **Organic Android USB**, chọn điện thoại rồi Run. Cấu hình dùng `http://127.0.0.1:8088/api/v1` qua kết nối USB; không dùng địa chỉ `10.0.2.2` của máy ảo hoặc các cờ software rendering dành riêng cho máy ảo. Nếu kết nối USB/điện thoại được khởi động lại và app không gọi được backend, chạy lại lệnh `reverse`.
+
+Hai cấu hình Android của IntelliJ dùng cache package tại `$PROJECT_DIR$/.pub-cache` (đã được Git bỏ qua), để tránh đường dẫn cache Windows chứa khoảng trắng như `C:/Users/Trong Vi`. Khi chạy bằng PowerShell, dùng cùng cache trước khi gọi Flutter:
+
+```powershell
+$env:PUB_CACHE = Join-Path (Get-Location).Path '.pub-cache'
+flutter pub get
+flutter run -d ID_DIEN_THOAI --dart-define=API_BASE_URL=http://127.0.0.1:8088/api/v1
+```
+
+Chạy các lệnh trên trong thư mục gốc `organic_mobile`. Sau khi thay đổi cấu hình `.run`, mở lại project nếu IntelliJ chưa cập nhật biến môi trường. Giữ đường dẫn dự án không có khoảng trắng; không chỉnh trực tiếp `package_config.json` vì Pub sẽ tạo lại tệp này.
 
 Build APK debug:
 

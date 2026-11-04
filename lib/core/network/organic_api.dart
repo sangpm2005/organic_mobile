@@ -48,6 +48,9 @@ class OrganicApi {
     List<UploadFile>? files,
     String fileField = 'files',
     String? jsonPart,
+    Map<String, String> headers = const {},
+    void Function(Map<String, String>)? onResponseHeaders,
+    bool followRedirects = true,
   }) async {
     final version = sessionVersion;
     final sentAccess = accessToken;
@@ -91,6 +94,8 @@ class OrganicApi {
     } else {
       req = http.Request(method, uri);
     }
+    req.headers.addAll(headers);
+    req.followRedirects = followRedirects;
     req.headers['Accept'] = 'application/json';
     if (authenticated && accessToken != null) {
       req.headers['Authorization'] = 'Bearer $accessToken';
@@ -104,6 +109,7 @@ class OrganicApi {
       final response = await (() async => http.Response.fromStream(
         await client.send(req),
       ))().timeout(timeout);
+      onResponseHeaders?.call(response.headers);
       if (authenticated && version != sessionVersion) {
         throw const ApiException('Phiên đăng nhập đã thay đổi.');
       }
@@ -139,6 +145,9 @@ class OrganicApi {
             files: files,
             fileField: fileField,
             jsonPart: jsonPart,
+            headers: headers,
+            onResponseHeaders: onResponseHeaders,
+            followRedirects: followRedirects,
           );
         }
       }

@@ -21,11 +21,14 @@ import '../../features/returns/data/pending_return_files.dart';
 import '../../features/reviews/data/reviews_repository.dart';
 import '../../core/media/upload_file.dart';
 import '../../shared/media/media_validation.dart';
+import '../../features/auth/data/google_auth_repository.dart';
+import '../../features/auth/data/google_identity.dart';
 
 class OrganicStore extends ChangeNotifier {
   final OrganicApi api;
   final FlutterSecureStorage storage;
   final ReturnDraftFiles returnDraftFiles;
+  late final GoogleAuthRepository googleAuth;
   late final feedbackService = FeedbackRepository(api);
   late final returnsService = ReturnsRepository(api);
   late final reviewService = ReviewsRepository(api);
@@ -64,12 +67,18 @@ class OrganicStore extends ChangeNotifier {
     OrganicApi? api,
     FlutterSecureStorage? storage,
     ReturnDraftFiles? returnDraftFiles,
+    GoogleIdentity? googleIdentity,
   }) : api = api ?? OrganicApi(),
        storage = storage ?? const FlutterSecureStorage(),
        returnDraftFiles = returnDraftFiles ?? ReturnDraftFiles() {
+    googleAuth = GoogleAuthRepository(this.api, identity: googleIdentity);
     this.api.onSessionChanged = _saveSession;
   }
   bool get loggedIn => user != null && api.accessToken != null;
+  bool get profileCompletionRequired =>
+      loggedIn &&
+      user?['profileCompletionRequired'] == true &&
+      '${profile?['phoneNumber'] ?? user?['phoneNumber'] ?? ''}'.trim().isEmpty;
   int get cartCount => (cart?['totalQuantity'] as num?)?.toInt() ?? 0;
   List<Json> get cartItems => objects(cart?['items']);
   List<Product> get featured =>
@@ -283,8 +292,42 @@ class OrganicStore extends ChangeNotifier {
         },
       ),
     );
+    await _acceptLogin(result, generation);
+  }
+
+  Future<bool> loginWithGoogle({bool Function()? isActive}) async {
+    final generation = _generation;
+    bool current() =>
+        generation == _generation && !_disposed && (isActive?.call() ?? true);
+    final result = await googleAuth.login(isCurrent: current);
+    return result != null &&
+        current() &&
+        await _acceptLogin(result, generation);
+  }
+
+  Future<bool> linkGoogle(
+    String currentPassword, {
+    bool Function()? isActive,
+  }) async {
+    if (!loggedIn) throw const ApiException('Vui lòng đăng nhập trước.');
+    final generation = _generation;
+    final result = await googleAuth.link(
+      currentPassword: currentPassword,
+      isCurrent: () =>
+          generation == _generation &&
+          loggedIn &&
+          !_disposed &&
+          (isActive?.call() ?? true),
+    );
+    return result != null &&
+        generation == _generation &&
+        loggedIn &&
+        !_disposed;
+  }
+
+  Future<bool> _acceptLogin(Json result, int generation) async {
     final info = object(result['user']);
-    if (generation != _generation || _disposed) return;
+    if (generation != _generation || _disposed) return false;
     if (!(info['roles'] as List? ?? []).any(
       (r) => '$r'.replaceFirst('ROLE_', '') == 'CUSTOMER',
     )) {
@@ -292,12 +335,19 @@ class OrganicStore extends ChangeNotifier {
         'Ứng dụng dành cho khách hàng. Vui lòng dùng tài khoản CUSTOMER.',
       );
     }
+    if (result['accessToken'] is! String ||
+        (result['accessToken'] as String).isEmpty ||
+        result['refreshToken'] is! String ||
+        (result['refreshToken'] as String).isEmpty) {
+      throw const ApiException('Máy chủ trả về phiên đăng nhập chưa hợp lệ.');
+    }
     _clearAccount();
     user = info;
     api.setSession(result['accessToken'], result['refreshToken']);
     await _saveSession();
     await _loadFavorites();
     await refreshAccount();
+    return true;
   }
 
   Future<void> logout() async {

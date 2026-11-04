@@ -6,8 +6,13 @@ class OrdersRepository {
   OrdersRepository(this.api);
   Future<Json> detail(String id) async =>
       object(await api.request('GET', '/orders/${Uri.encodeComponent(id)}'));
-  Future<void> cancel(String id) async =>
-      api.request('POST', '/orders/${Uri.encodeComponent(id)}/cancel');
+  Future<Json> cancel(String id) async => object(
+    await api.request(
+      'POST',
+      '/orders/${Uri.encodeComponent(id)}/cancel',
+      timeout: const Duration(seconds: 120),
+    ),
+  );
   Future<Json> initiate(String orderId, String gateway) async => object(
     await api.request(
       'POST',

@@ -5,6 +5,8 @@ import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/theme/organic_theme.dart';
 import 'package:organic_mobile/shared/widgets/brand.dart';
 
+import '../../account/presentation/profile_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -14,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final form = GlobalKey<FormState>();
   final username = TextEditingController(), password = TextEditingController();
-  bool busy = false, hidden = true;
+  bool busy = false, hidden = true, googleBusy = false;
   String? error;
   @override
   void dispose() {
@@ -24,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> submit() async {
+    if (busy) return;
     if (!form.currentState!.validate()) {
       return;
     }
@@ -43,6 +46,34 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) {
         setState(() => busy = false);
+      }
+    }
+  }
+
+  Future<void> googleLogin() async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      googleBusy = true;
+      error = null;
+    });
+    final store = StoreScope.of(context);
+    try {
+      final accepted = await store.loginWithGoogle(isActive: () => mounted);
+      if (!accepted || !mounted) return;
+      if (store.profileCompletionRequired) {
+        toast(context, 'Bổ sung số điện thoại để hoàn tất hồ sơ khách hàng.');
+        await open(context, const ProfileScreen());
+      }
+      if (mounted && store.loggedIn) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          busy = false;
+          googleBusy = false;
+        });
       }
     }
   }
@@ -128,8 +159,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: busy ? null : submit,
-                  child: Text(busy ? 'Đang đăng nhập…' : 'Đăng nhập'),
+                  child: Text(
+                    busy && !googleBusy ? 'Đang đăng nhập…' : 'Đăng nhập',
+                  ),
                 ),
+                if (StoreScope.of(context).googleAuth.supported) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    key: const ValueKey('auth.google'),
+                    onPressed: busy ? null : googleLogin,
+                    icon: Image.asset(
+                      'assets/images/google-g.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    label: Text(
+                      googleBusy
+                          ? 'Đang kết nối Google…'
+                          : 'Đăng nhập bằng Google',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: busy

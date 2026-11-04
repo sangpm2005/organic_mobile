@@ -13,6 +13,8 @@ import 'package:organic_mobile/shared/widgets/empty_state.dart';
 import 'package:organic_mobile/shared/widgets/heading.dart';
 import 'package:organic_mobile/shared/widgets/panel.dart';
 
+import '../../account/presentation/profile_screen.dart';
+
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
   @override
@@ -195,11 +197,30 @@ class _CartScreenState extends State<CartScreen> {
                         busy ||
                             store.cartItems.any((i) => i['available'] != true)
                         ? null
-                        : () => open(
-                            context,
-                            const CheckoutScreen(),
-                            account: true,
-                          ),
+                        : () async {
+                            if (store.profileCompletionRequired) {
+                              await open(
+                                context,
+                                const ProfileScreen(),
+                                account: true,
+                              );
+                              if (!context.mounted || !store.loggedIn) return;
+                              if (store.profileCompletionRequired) {
+                                toast(
+                                  context,
+                                  'Bổ sung số điện thoại trước khi đặt hàng.',
+                                );
+                                return;
+                              }
+                            }
+                            if (context.mounted) {
+                              await open(
+                                context,
+                                const CheckoutScreen(),
+                                account: true,
+                              );
+                            }
+                          },
                     icon: const Icon(Icons.arrow_forward_rounded),
                     label: const Text('Tiến hành đặt hàng'),
                   ),

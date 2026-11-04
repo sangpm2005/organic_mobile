@@ -18,6 +18,7 @@ import '../../feedback/presentation/feedback_list_screen.dart';
 import '../../returns/presentation/returns_screen.dart';
 import '../../reviews/presentation/reviews_screen.dart';
 import '../../favorites/presentation/favorites_screen.dart';
+import '../../auth/presentation/google_link_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -78,6 +79,28 @@ class AccountScreen extends StatelessWidget {
             ),
           ),
           if (store.accountError != null) AccountError(store),
+          if (store.profileCompletionRequired)
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Hoàn tất hồ sơ khách hàng'),
+              subtitle: const Text(
+                'Bổ sung số điện thoại để mua hàng và nhận hỗ trợ.',
+              ),
+              onTap: () => open(context, const ProfileScreen()),
+            ),
+          if (store.googleAuth.supported)
+            ListTile(
+              leading: Image.asset(
+                'assets/images/google-g.png',
+                width: 24,
+                height: 24,
+              ),
+              title: const Text('Liên kết Google'),
+              subtitle: const Text(
+                'Dùng Google để đăng nhập tài khoản hiện tại',
+              ),
+              onTap: () => open(context, const GoogleLinkScreen()),
+            ),
           ListTile(
             leading: const Icon(Icons.favorite_outline, color: moss),
             title: const Text('Sản phẩm yêu thích'),

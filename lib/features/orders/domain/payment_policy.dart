@@ -28,6 +28,8 @@ Uri paymentRedirect(Json payment) {
 }
 
 bool canCancelOrder(Json order) =>
+    !objects(order['payments'])
+        .any((payment) => payment['status'] == 'requires_review') &&
     order['paymentMethod'] != 'exchange' &&
     ['pending_payment', 'confirmed'].contains(order['status']) &&
     ![
@@ -38,6 +40,8 @@ bool canCancelOrder(Json order) =>
     ].contains(order['paymentStatus']);
 
 bool canPayOrder(Json order) =>
+    !objects(order['payments'])
+        .any((payment) => payment['status'] == 'requires_review') &&
     order['paymentMethod'] != 'exchange' &&
     order['status'] == 'pending_payment' &&
     ![

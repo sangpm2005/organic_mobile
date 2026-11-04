@@ -21,23 +21,28 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
   Widget build(BuildContext context) => FutureBuilder<T>(
     future: future,
     builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(60),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      }
       if (snapshot.hasError) {
         return EmptyState(
           'Chưa tải được dữ liệu',
           '${snapshot.error}',
           icon: Icons.cloud_off_outlined,
           action: OutlinedButton.icon(
-            onPressed: () => setState(() => future = widget.load()),
+            onPressed: () {
+              final next = widget.load();
+              setState(() {
+                future = next;
+              });
+            },
             icon: const Icon(Icons.refresh),
             label: const Text('Thử lại'),
-          ),
-        );
-      }
-      if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(60),
-            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         );
       }

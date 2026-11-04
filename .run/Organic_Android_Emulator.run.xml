@@ -2,6 +2,9 @@
   <configuration default="false" name="Organic Android Emulator" type="FlutterRunConfigurationType" factoryName="Flutter">
     <option name="additionalArgs" value="--no-enable-impeller --enable-software-rendering" />
     <option name="filePath" value="$PROJECT_DIR$/lib/main.dart" />
+    <option name="envs">
+      <entry key="PUB_CACHE" value="$PROJECT_DIR$/.pub-cache" />
+    </option>
     <method v="2" />
   </configuration>
 </component>

@@ -15,9 +15,9 @@ import 'widgets/price_summary.dart';
 
 import 'package:organic_mobile/shared/widgets/panel.dart';
 import 'package:organic_mobile/shared/widgets/session_boundary.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../orders/domain/payment_policy.dart';
+import '../../orders/presentation/payment_launcher.dart';
+import 'widgets/payment_methods.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -267,13 +267,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           method,
         );
         if (!sameSession) return;
-        final url = paymentRedirect(payment);
-        if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-          paymentWarning = 'Đơn đã tạo. Chưa mở được cổng thanh toán; bạn có thể mở lại từ chi tiết đơn.';
-        }
-      } catch (_) {
+        await openPaymentPortal(payment);
+      } catch (e) {
         paymentWarning =
-            'Đơn đã tạo. Vui lòng thử thanh toán lại từ chi tiết đơn.';
+            'Đơn đã tạo. $e Bạn có thể thử lại trong chi tiết đơn hàng.';
       }
     }
     for (final item in items) {
@@ -428,36 +425,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: const TextStyle(fontSize: 11, color: muted),
           ),
           const SizedBox(height: 22),
-          DropdownButtonFormField<String>(
-            initialValue: method,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Phương thức thanh toán',
-            ),
-            items: [
-              for (final e in {
-                'cod': 'Thanh toán khi nhận hàng (COD)',
-                'vnpay': 'VNPay',
-                'stripe': 'Thẻ quốc tế (Stripe)',
-                'paypal': 'PayPal',
-                'payos': 'PayOS / VietQR',
-              }.entries)
-                if (methods[e.key] == true || e.key == method)
-                  DropdownMenuItem(
-                    value: e.key,
-                    child: Text(
-                      e.value,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-            ],
-            onChanged: busy || submitted
-                ? null
-                : (v) {
-                    method = v!;
-                    invalidate();
-                  },
+          PaymentMethods(
+            available: methods,
+            value: method,
+            enabled: !busy && !submitted,
+            onChanged: (value) {
+              method = value;
+              invalidate();
+            },
           ),
           const SizedBox(height: 20),
           if (quote != null)

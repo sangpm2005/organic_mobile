@@ -21,7 +21,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!initialized) {
-      final p = StoreScope.of(context).profile;
+      final store = StoreScope.of(context);
+      final p = store.profile ?? store.user;
       for (final e in fields.entries) {
         e.value.text = '${p?[e.key] ?? ''}';
       }
@@ -98,6 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       (v ?? '').isNotEmpty &&
                       !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v!)) {
                     return 'Email chưa hợp lệ.';
+                  }
+                  if (e.key == 'phoneNumber' &&
+                      !RegExp(r'^\+?[0-9]{9,15}$').hasMatch((v ?? '').trim())) {
+                    return 'Nhập số điện thoại có 9–15 chữ số.';
                   }
                   if (e.key == 'dateOfBirth' &&
                       (v ?? '').isNotEmpty &&
