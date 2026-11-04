@@ -1,0 +1,5 @@
+package vn.huit.organic_mobile
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()
