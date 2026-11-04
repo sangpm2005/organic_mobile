@@ -20,7 +20,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = if (organicAcceptanceBuild) "vn.huit.organic_mobile.uat" else "vn.huit.organic_mobile"
-        manifestPlaceholders["organicAppLabel"] = if (organicAcceptanceBuild) "Mộc Organic UAT" else "Mộc Organic"
+        manifestPlaceholders["organicAppLabel"] = if (organicAcceptanceBuild) "organicfood UAT" else "organicfood"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

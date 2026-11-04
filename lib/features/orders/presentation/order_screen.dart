@@ -20,6 +20,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../catalog/presentation/widgets/product_photo.dart';
 import '../domain/payment_policy.dart';
+import '../../feedback/presentation/feedback_list_screen.dart';
+import '../../returns/presentation/returns_screen.dart';
+import '../../reviews/presentation/reviews_screen.dart';
 
 class OrderScreen extends StatefulWidget {
   final String id;
@@ -347,6 +350,36 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                       child: const Text('Hủy đơn hàng'),
                     ),
                   ],
+                  const SizedBox(height: 20),
+                  Text(
+                    'Hỗ trợ sau mua',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => open(
+                      context,
+                      FeedbackListScreen(orderId: widget.id),
+                      account: true,
+                    ),
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Phản hồi về đơn hàng'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => open(
+                      context,
+                      ReturnsScreen(orderId: widget.id),
+                      account: true,
+                    ),
+                    icon: const Icon(Icons.assignment_return_outlined),
+                    label: const Text('Yêu cầu đổi trả / hoàn tiền'),
+                  ),
+                  if (['delivered', 'completed'].contains(order!['status']))
+                    TextButton.icon(
+                      onPressed: () =>
+                          open(context, const ReviewsScreen(), account: true),
+                      icon: const Icon(Icons.star_outline),
+                      label: const Text('Đánh giá sản phẩm đã nhận'),
+                    ),
                   if (error != null)
                     Text(
                       error!,

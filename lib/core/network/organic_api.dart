@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+import '../media/upload_file.dart';
 
 import '../utils/json.dart';
 import 'api_exception.dart';
@@ -42,6 +45,9 @@ class OrganicApi {
     String? idempotencyKey,
     bool retry = true,
     Duration timeout = const Duration(seconds: 30),
+    List<UploadFile>? files,
+    String fileField = 'files',
+    String? jsonPart,
   }) async {
     final version = sessionVersion;
     final sentAccess = accessToken;
@@ -54,13 +60,43 @@ class OrganicApi {
                   entry.key: '${entry.value}',
             },
     );
-    final req = http.Request(method, uri)
-      ..headers['Accept'] = 'application/json';
+    final http.BaseRequest req;
+    if (files != null) {
+      final multipart = http.MultipartRequest(method, uri);
+      if (jsonPart != null && body != null) {
+        multipart.files.add(
+          http.MultipartFile.fromString(
+            jsonPart,
+            jsonEncode(body),
+            contentType: MediaType('application', 'json'),
+          ),
+        );
+      } else if (body != null) {
+        multipart.fields.addAll({
+          for (final e in body.entries)
+            if (e.value != null) e.key: '${e.value}',
+        });
+      }
+      for (final file in files) {
+        multipart.files.add(
+          http.MultipartFile.fromBytes(
+            fileField,
+            file.bytes,
+            filename: file.name,
+            contentType: MediaType.parse(file.contentType),
+          ),
+        );
+      }
+      req = multipart;
+    } else {
+      req = http.Request(method, uri);
+    }
+    req.headers['Accept'] = 'application/json';
     if (authenticated && accessToken != null) {
       req.headers['Authorization'] = 'Bearer $accessToken';
     }
     if (idempotencyKey != null) req.headers['Idempotency-Key'] = idempotencyKey;
-    if (body != null) {
+    if (body != null && req is http.Request) {
       req.headers['Content-Type'] = 'application/json; charset=utf-8';
       req.body = jsonEncode(body);
     }
@@ -100,6 +136,9 @@ class OrganicApi {
             idempotencyKey: idempotencyKey,
             retry: false,
             timeout: timeout,
+            files: files,
+            fileField: fileField,
+            jsonPart: jsonPart,
           );
         }
       }

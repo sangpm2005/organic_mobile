@@ -317,7 +317,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     StoreScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Đặt hàng cùng Mộc')),
+      appBar: AppBar(title: const Text('Đặt hàng cùng organicfood')),
       body: ListView(
         padding: const EdgeInsets.all(22),
         children: [

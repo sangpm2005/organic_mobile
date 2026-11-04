@@ -8,12 +8,14 @@ class PagedRecords extends StatefulWidget {
   final Widget Function(Json item) itemBuilder;
   final String empty;
   final List<Widget> header;
+  final Object? refreshToken;
   const PagedRecords({
     super.key,
     required this.load,
     required this.itemBuilder,
     required this.empty,
     this.header = const [],
+    this.refreshToken,
   });
   @override
   State<PagedRecords> createState() => _PagedRecordsState();
@@ -24,6 +26,19 @@ class _PagedRecordsState extends State<PagedRecords> {
   int page = -1;
   bool busy = false, more = true;
   String? error;
+  bool refreshAfter = false;
+  @override
+  void didUpdateWidget(covariant PagedRecords oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      if (busy) {
+        refreshAfter = true;
+      } else {
+        fetch(reset: true);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +65,10 @@ class _PagedRecordsState extends State<PagedRecords> {
       if (mounted) setState(() => error = '$e');
     } finally {
       if (mounted) setState(() => busy = false);
+      if (mounted && refreshAfter) {
+        refreshAfter = false;
+        fetch(reset: true);
+      }
     }
   }
 

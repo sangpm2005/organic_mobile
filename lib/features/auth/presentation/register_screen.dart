@@ -109,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Thành viên của Mộc')),
+    appBar: AppBar(title: const Text('Thành viên của organicfood')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -123,7 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ? widget.verifyExisting
                     ? 'Nhập email đã đăng ký và mã OTP. Bạn có thể yêu cầu gửi lại mã nếu cần.'
                     : 'Nhập mã được gửi đến ${fields['email']!.text}.'
-              : 'Mộc gửi mã xác thực qua email sau khi bạn đăng ký.',
+              : 'organicfood gửi mã xác thực qua email sau khi bạn đăng ký.',
           style: const TextStyle(color: muted),
         ),
         const SizedBox(height: 24),

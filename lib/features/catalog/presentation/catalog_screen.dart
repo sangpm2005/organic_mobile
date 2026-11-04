@@ -96,7 +96,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
       onRefresh: load,
       child: ListView(
         children: [
-          Heading(widget.title ?? 'Ghé vườn nhà Mộc', eyebrow: 'Sản phẩm'),
+          Heading(
+            widget.title ?? 'Ghé vườn nhà organicfood',
+            eyebrow: 'Sản phẩm',
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: TextField(

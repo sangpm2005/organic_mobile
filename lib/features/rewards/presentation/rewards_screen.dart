@@ -76,7 +76,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Mộc thành viên'),
+          title: const Text('Thành viên organicfood'),
           bottom: store.loggedIn
               ? const TabBar(
                   tabs: [

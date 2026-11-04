@@ -10,6 +10,9 @@ import 'package:organic_mobile/shared/widgets/async_view.dart';
 import 'package:organic_mobile/shared/widgets/panel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../reviews/presentation/reviews_screen.dart';
+import '../../reviews/presentation/widgets/product_reviews.dart';
+
 class ProductScreen extends StatefulWidget {
   final String id;
   const ProductScreen(this.id, {super.key});
@@ -21,6 +24,7 @@ class _ProductScreenState extends State<ProductScreen> {
   Json? selected;
   Json? availability;
   int quantity = 1;
+  int reviewRevision = 0;
   bool adding = false;
   Future<Json> load() async {
     final api = StoreScope.of(context).api;
@@ -70,7 +74,26 @@ class _ProductScreenState extends State<ProductScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Từ vườn nhà Mộc')),
+    appBar: AppBar(
+      title: const Text('Sản phẩm organicfood'),
+      actions: [
+        IconButton(
+          tooltip: 'Lưu sản phẩm yêu thích',
+          icon: Icon(
+            StoreScope.of(context).favorites.contains(widget.id)
+                ? Icons.favorite
+                : Icons.favorite_border,
+          ),
+          onPressed: () async {
+            try {
+              await StoreScope.of(context).toggleFavorite(widget.id);
+            } catch (e) {
+              if (context.mounted) toast(context, e);
+            }
+          },
+        ),
+      ],
+    ),
     body: AsyncView<Json>(
       load: load,
       builder: (data) {
@@ -259,27 +282,20 @@ class _ProductScreenState extends State<ProductScreen> {
               '${object(data['reviewSummary'])['totalReviews'] ?? 0} đánh giá · ${object(data['reviewSummary'])['averageRating'] ?? 'Chưa có điểm'} / 5',
               style: const TextStyle(color: muted),
             ),
-            AsyncView<Json>(
-              load: () async => object(
-                await StoreScope.of(context).api.request(
-                  'GET',
-                  '/products/${widget.id}/reviews',
-                  authenticated: false,
-                ),
-              ),
-              builder: (reviews) => Column(
-                children: pageItems(reviews['reviews'])
-                    .map(
-                      (r) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          '${r['title'] ?? r['customerName'] ?? 'Khách hàng'} · ${r['rating']} ★',
-                        ),
-                        subtitle: Text('${r['content'] ?? ''}'),
-                      ),
-                    )
-                    .toList(),
-              ),
+            ProductReviews(widget.id, revision: reviewRevision),
+            TextButton.icon(
+              onPressed: () async {
+                if (await ensureLogin(context) && context.mounted) {
+                  await open(
+                    context,
+                    ReviewsScreen(productId: widget.id),
+                    account: true,
+                  );
+                  if (mounted) setState(() => reviewRevision++);
+                }
+              },
+              icon: const Icon(Icons.rate_review_outlined),
+              label: const Text('Viết / quản lý đánh giá sản phẩm'),
             ),
           ],
         );

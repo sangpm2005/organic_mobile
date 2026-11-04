@@ -1,5 +1,5 @@
 name: organic_mobile
-description: Ứng dụng khách hàng Mộc Organic, dùng chung API với organic_frontend.
+description: Ứng dụng khách hàng organicfood, dùng chung API với organic_frontend.
 publish_to: none
 version: 0.1.0+1
 environment:
@@ -13,6 +13,10 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   intl: ^0.20.3
   url_launcher: ^6.3.3
+  file_selector: ^1.1.0
+  path_provider: ^2.1.6
+  http_parser: ^4.1.2
+  mime: ^2.1.0
 dev_dependencies:
   integration_test:
     sdk: flutter

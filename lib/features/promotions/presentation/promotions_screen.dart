@@ -12,7 +12,7 @@ class PromotionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = StoreScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Ưu đãi từ Mộc')),
+      appBar: AppBar(title: const Text('Ưu đãi từ organicfood')),
       body: AsyncView<List<Json>>(
         load: store.promotionService.feed,
         builder: (offers) => ListView(

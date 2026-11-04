@@ -11,7 +11,13 @@ import 'package:organic_mobile/shared/widgets/account_error.dart';
 import 'package:organic_mobile/shared/widgets/brand.dart';
 import 'package:organic_mobile/shared/widgets/heading.dart';
 import 'package:organic_mobile/shared/widgets/panel.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../../store_info/presentation/store_info_screen.dart';
+
+import '../../feedback/presentation/feedback_list_screen.dart';
+import '../../returns/presentation/returns_screen.dart';
+import '../../reviews/presentation/reviews_screen.dart';
+import '../../favorites/presentation/favorites_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -28,16 +34,28 @@ class AccountScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const Heading('Góc nhỏ của bạn', eyebrow: 'Mộc thành viên'),
+          const Heading('Góc nhỏ của bạn', eyebrow: 'Thành viên organicfood'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: Panel(
               child: Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 30,
                     backgroundColor: sage,
-                    child: Icon(Icons.person_outline, size: 30, color: moss),
+                    foregroundImage:
+                        '${store.profile?['avatarUrl'] ?? ''}'.isEmpty
+                        ? null
+                        : NetworkImage('${store.profile!['avatarUrl']}'),
+                    onForegroundImageError:
+                        '${store.profile?['avatarUrl'] ?? ''}'.isEmpty
+                        ? null
+                        : (_, _) {},
+                    child: const Icon(
+                      Icons.person_outline,
+                      size: 30,
+                      color: moss,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -60,6 +78,34 @@ class AccountScreen extends StatelessWidget {
             ),
           ),
           if (store.accountError != null) AccountError(store),
+          ListTile(
+            leading: const Icon(Icons.favorite_outline, color: moss),
+            title: const Text('Sản phẩm yêu thích'),
+            subtitle: Text(
+              '${store.favorites.length} sản phẩm đã lưu trên ứng dụng',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const FavoritesScreen(), account: true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.rate_review_outlined, color: moss),
+            title: const Text('Đánh giá của tôi'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const ReviewsScreen(), account: true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline, color: moss),
+            title: const Text('Phản hồi & hỗ trợ'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () =>
+                open(context, const FeedbackListScreen(), account: true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.assignment_return_outlined, color: moss),
+            title: const Text('Đổi trả & hoàn tiền'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const ReturnsScreen(), account: true),
+          ),
           const SizedBox(height: 14),
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
@@ -97,9 +143,9 @@ class AccountScreen extends StatelessWidget {
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
             leading: const Icon(Icons.support_agent_outlined, color: moss),
-            title: const Text('Liên hệ cửa hàng'),
-            subtitle: const Text('0344 855 913'),
-            onTap: () => launchUrl(Uri.parse('tel:0344855913')),
+            title: const Text('Thông tin & liên hệ cửa hàng'),
+            subtitle: const Text('Địa chỉ, giờ mở cửa và câu hỏi thường gặp'),
+            onTap: () => open(context, const StoreInfoScreen()),
           ),
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
@@ -109,7 +155,7 @@ class AccountScreen extends StatelessWidget {
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Đăng xuất khỏi Mộc?'),
+                  title: const Text('Đăng xuất khỏi organicfood?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -131,7 +177,7 @@ class AccountScreen extends StatelessWidget {
           const Center(child: Brand()),
           const SizedBox(height: 12),
           const Text(
-            'Mộc Organic · Phiên bản 0.1.0',
+            'organicfood · Phiên bản 0.1.0',
             textAlign: TextAlign.center,
             style: TextStyle(color: muted, fontSize: 10),
           ),

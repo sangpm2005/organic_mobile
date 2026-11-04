@@ -17,7 +17,7 @@ class LoginGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: EmptyState(
-      'Chào bạn đến với Mộc',
+      'Chào bạn đến với organicfood',
       message,
       icon: Icons.person_outline,
       action: FilledButton(

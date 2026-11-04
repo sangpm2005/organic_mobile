@@ -15,10 +15,22 @@ import '../../features/orders/domain/order_labels.dart';
 import '../../features/rewards/data/rewards_repository.dart';
 import '../../features/promotions/data/promotions_repository.dart';
 import '../../features/notifications/data/notifications_repository.dart';
+import '../../features/feedback/data/feedback_repository.dart';
+import '../../features/returns/data/returns_repository.dart';
+import '../../features/returns/data/pending_return_files.dart';
+import '../../features/reviews/data/reviews_repository.dart';
+import '../../core/media/upload_file.dart';
+import '../../shared/media/media_validation.dart';
 
 class OrganicStore extends ChangeNotifier {
   final OrganicApi api;
   final FlutterSecureStorage storage;
+  final ReturnDraftFiles returnDraftFiles;
+  late final feedbackService = FeedbackRepository(api);
+  late final returnsService = ReturnsRepository(api);
+  late final reviewService = ReviewsRepository(api);
+  Json? pendingReturn;
+  Future<Json>? _returnPending;
   late final checkout = CheckoutRepository(api);
   late final orderService = OrdersRepository(api);
   late final rewardService = RewardsRepository(api);
@@ -29,6 +41,9 @@ class OrganicStore extends ChangeNotifier {
   String selectedPromotionCode = '';
   Future<Json>? _exchangePending;
   List<Json> publicOffers = [], inbox = [];
+  Set<String> favorites = {};
+  int _favoriteRevision = 0;
+  Future<void> _favoriteSave = Future.value();
   int _inboxUnread = 0, _inboxPage = 0;
   bool hasMoreInbox = false, _active = true;
   Json? user, profile, cart, rewards, pendingCheckout;
@@ -45,9 +60,13 @@ class OrganicStore extends ChangeNotifier {
   bool _disposed = false;
   Future<void> _pendingSave = Future.value();
   Future<void>? _accountPending;
-  OrganicStore({OrganicApi? api, FlutterSecureStorage? storage})
-    : api = api ?? OrganicApi(),
-      storage = storage ?? const FlutterSecureStorage() {
+  OrganicStore({
+    OrganicApi? api,
+    FlutterSecureStorage? storage,
+    ReturnDraftFiles? returnDraftFiles,
+  }) : api = api ?? OrganicApi(),
+       storage = storage ?? const FlutterSecureStorage(),
+       returnDraftFiles = returnDraftFiles ?? ReturnDraftFiles() {
     this.api.onSessionChanged = _saveSession;
   }
   bool get loggedIn => user != null && api.accessToken != null;
@@ -84,7 +103,7 @@ class OrganicStore extends ChangeNotifier {
             'key': 'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
             'kind': 'promotion',
             'title': p['name'],
-            'message': p['description'] ?? 'Ưu đãi mới từ Mộc',
+            'message': p['description'] ?? 'Ưu đãi mới từ organicfood',
             'createdAt': p['startDate'],
             'read': readUpdates.contains(
               'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
@@ -117,6 +136,9 @@ class OrganicStore extends ChangeNotifier {
         pendingVoucherExchange = data['pendingVoucherExchange'] == null
             ? null
             : object(data['pendingVoucherExchange']);
+        pendingReturn = data['pendingReturn'] == null
+            ? null
+            : object(data['pendingReturn']);
       }
     } catch (_) {
       /* A fresh session also works when platform storage is unavailable. */
@@ -126,12 +148,13 @@ class OrganicStore extends ChangeNotifier {
         unawaited(refreshAccount());
       }
     });
+    await _loadFavorites();
     if (loggedIn) {
       unawaited(refreshAccount());
     }
   }
 
-  Future<void> _saveSession() async {
+  Future<void> _saveSession({bool requirePersistence = false}) async {
     if (api.accessToken == null) {
       _clearAccount();
     }
@@ -144,8 +167,9 @@ class OrganicStore extends ChangeNotifier {
             'readUpdates': readUpdates.toList(),
             'pendingCheckout': pendingCheckout,
             'pendingVoucherExchange': pendingVoucherExchange,
+            'pendingReturn': pendingReturn,
           });
-    _pendingSave = _pendingSave.then((_) async {
+    _pendingSave = _pendingSave.catchError((Object _) {}).then((_) async {
       try {
         if (snapshot == null) {
           await storage.delete(key: 'moc.session.v1');
@@ -153,6 +177,11 @@ class OrganicStore extends ChangeNotifier {
           await storage.write(key: 'moc.session.v1', value: snapshot);
         }
       } catch (_) {
+        if (requirePersistence) {
+          throw const ApiException(
+            'Chưa lưu được yêu cầu trên thiết bị. Lần thử này chưa được gửi; vui lòng thử lại.',
+          );
+        }
         /* Keep the current in-memory session when platform storage fails. */
       }
     });
@@ -161,9 +190,19 @@ class OrganicStore extends ChangeNotifier {
   }
 
   void _clearAccount() {
+    final draft = pendingReturn;
+    if (draft != null) {
+      unawaited(
+        returnDraftFiles.remove('${draft['key']}').catchError((Object _) {}),
+      );
+    }
+    pendingReturn = null;
+    _returnPending = null;
     _generation++;
     _cartRevision++;
     user = profile = cart = rewards = null;
+    favorites = {};
+    _favoriteRevision++;
     pendingCheckout = null;
     pendingVoucherExchange = null;
     _exchangePending = null;
@@ -257,6 +296,7 @@ class OrganicStore extends ChangeNotifier {
     user = info;
     api.setSession(result['accessToken'], result['refreshToken']);
     await _saveSession();
+    await _loadFavorites();
     await refreshAccount();
   }
 
@@ -564,6 +604,122 @@ class OrganicStore extends ChangeNotifier {
     _inboxUnread = number(data['unreadCount']).toInt();
     hasMoreInbox = inbox.length < number(object(data['page'])['totalElements']);
     notifyListeners();
+  }
+
+  String get _favoriteKey =>
+      'organicfood.favorites.v1.${base64Url.encode(utf8.encode('${user?['accountId'] ?? user?['username'] ?? 'guest'}'))}';
+  Future<void> _loadFavorites() async {
+    final generation = _generation,
+        revision = _favoriteRevision,
+        key = _favoriteKey;
+    try {
+      final raw = await storage.read(key: key);
+      if (generation != _generation || revision != _favoriteRevision) return;
+      favorites = Set<String>.from(raw == null ? [] : jsonDecode(raw));
+      notifyListeners();
+    } catch (_) {
+      /* Keep in-memory favorites if storage is unavailable. */
+    }
+  }
+
+  Future<void> toggleFavorite(String id) async {
+    if (!favorites.contains(id) && favorites.length >= 200) {
+      throw const ApiException('Bạn đã lưu tối đa 200 sản phẩm.');
+    }
+    _favoriteRevision++;
+    if (!favorites.remove(id)) favorites.add(id);
+    final key = _favoriteKey, value = jsonEncode(favorites.toList());
+    notifyListeners();
+    _favoriteSave = _favoriteSave
+        .catchError((Object _) {})
+        .then((_) => storage.write(key: key, value: value));
+    await _favoriteSave;
+  }
+
+  Future<Json> submitReturn({Json? payload, List<UploadFile>? files}) {
+    if (_returnPending != null) return _returnPending!;
+    final pending = _submitReturn(payload, files);
+    _returnPending = pending;
+    return pending.whenComplete(() {
+      if (identical(_returnPending, pending)) _returnPending = null;
+    });
+  }
+
+  Future<Json> _submitReturn(Json? payload, List<UploadFile>? files) async {
+    if (!loggedIn) throw const ApiException('Vui lòng đăng nhập lại.');
+    final generation = _generation;
+    if (pendingReturn == null) {
+      if (payload == null || files == null) {
+        throw const ApiException('Chưa có yêu cầu để gửi.');
+      }
+      validateMedia(files, imagesOnly: true, required: true);
+      final key = newIdempotencyKey();
+      try {
+        await returnDraftFiles.put(key, files);
+      } catch (_) {
+        throw const ApiException(
+          'Chưa lưu được ảnh minh chứng trên thiết bị. Yêu cầu chưa được gửi.',
+        );
+      }
+      if (generation != _generation || !loggedIn) {
+        await returnDraftFiles.remove(key);
+        throw const ApiException('Phiên đăng nhập đã thay đổi.');
+      }
+      pendingReturn = {'key': key, 'payload': jsonDecode(jsonEncode(payload))};
+    } else if (payload != null &&
+        jsonEncode(object(pendingReturn!['payload'])) != jsonEncode(payload)) {
+      throw const ApiException(
+        'Cần kiểm tra yêu cầu đang chờ trước khi gửi nội dung mới.',
+      );
+    }
+    if (generation != _generation || !loggedIn) {
+      throw const ApiException('Phiên đăng nhập đã thay đổi.');
+    }
+    await _saveSession(requirePersistence: true);
+    if (generation != _generation || !loggedIn) {
+      throw const ApiException('Phiên đăng nhập đã thay đổi.');
+    }
+    final pending = pendingReturn!, key = '${pendingReturn!['key']}';
+    final attachments = await returnDraftFiles.read(key);
+    if (generation != _generation || !loggedIn) {
+      throw const ApiException('Phiên đăng nhập đã thay đổi.');
+    }
+    try {
+      final result = await returnsService.create(
+        object(pending['payload']),
+        attachments,
+        key,
+      );
+      if (generation != _generation || !loggedIn) {
+        throw const ApiException('Phiên đăng nhập đã thay đổi.');
+      }
+      pendingReturn = null;
+      await _saveSession();
+      try {
+        await returnDraftFiles.remove(key);
+      } catch (_) {
+        /* Do not retry a confirmed request because local cleanup failed. */
+      }
+      if (generation != _generation || !loggedIn) {
+        throw const ApiException('Phiên đăng nhập đã thay đổi.');
+      }
+      return result;
+    } on ApiException catch (e) {
+      if (generation == _generation &&
+          e.status != null &&
+          e.status! >= 400 &&
+          e.status! < 500 &&
+          ![408, 429].contains(e.status)) {
+        pendingReturn = null;
+        await _saveSession();
+        try {
+          await returnDraftFiles.remove(key);
+        } catch (_) {
+          /* Private cache cleanup can be retried later. */
+        }
+      }
+      rethrow;
+    }
   }
 
   static String newIdempotencyKey() {

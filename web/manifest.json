@@ -1,6 +1,6 @@
 {
-    "name": "organic_mobile",
-    "short_name": "organic_mobile",
+    "name": "organicfood",
+    "short_name": "organicfood",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

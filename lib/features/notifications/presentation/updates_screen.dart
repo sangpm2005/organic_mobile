@@ -10,6 +10,8 @@ import '../../../shared/state/store_scope.dart';
 import '../../../shared/theme/organic_theme.dart';
 import '../../../shared/widgets/account_error.dart';
 import '../../../shared/widgets/panel.dart';
+import '../../feedback/presentation/feedback_detail_screen.dart';
+import '../../returns/presentation/return_detail_screen.dart';
 
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
@@ -30,6 +32,21 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
       }
       if (update['kind'] == 'promotion') {
         open(context, const PromotionsScreen());
+      }
+      if (update['kind'] == 'inbox') {
+        if (update['returnRequestId'] != null) {
+          open(
+            context,
+            ReturnDetailScreen('${update['returnRequestId']}'),
+            account: true,
+          );
+        } else if (update['feedbackId'] != null) {
+          open(
+            context,
+            FeedbackDetailScreen('${update['feedbackId']}'),
+            account: true,
+          );
+        }
       }
     } catch (e) {
       if (mounted) toast(context, e);
@@ -52,7 +69,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   Widget build(BuildContext context) {
     final store = StoreScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Tin từ Mộc')),
+      appBar: AppBar(title: const Text('Tin từ organicfood')),
       body: !store.loggedIn
           ? const LoginGate('Đăng nhập để nhận cập nhật đơn hàng và ưu đãi.')
           : RefreshIndicator(

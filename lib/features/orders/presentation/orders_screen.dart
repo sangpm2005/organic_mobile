@@ -19,7 +19,7 @@ class OrdersScreen extends StatelessWidget {
     final store = StoreScope.of(context);
     if (!store.loggedIn) {
       return const LoginGate(
-        'Theo dõi hành trình giao hàng và xem lại những lần mua cùng Mộc.',
+        'Theo dõi hành trình giao hàng và xem lại những lần mua cùng organicfood.',
       );
     }
     return RefreshIndicator(

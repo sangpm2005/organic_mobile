@@ -52,12 +52,12 @@ class _CartScreenState extends State<CartScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const Heading('Giỏ xanh của bạn', eyebrow: 'Mộc đồng hành'),
+          const Heading('Giỏ xanh của bạn', eyebrow: 'organicfood đồng hành'),
           if (store.accountError != null) AccountError(store),
           if (store.cartItems.isEmpty)
             const EmptyState(
               'Giỏ hàng còn đang trống',
-              'Ghé vườn nhà Mộc và chọn một chút tươi lành cho hôm nay.',
+              'Ghé vườn nhà organicfood và chọn một chút tươi lành cho hôm nay.',
               icon: Icons.shopping_bag_outlined,
             ),
           ...store.cartItems.map(

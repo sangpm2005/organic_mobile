@@ -1,6 +1,6 @@
-# Mộc Organic mobile
+# organicfood mobile
 
-Ứng dụng Flutter dành cho khách hàng của hệ thống Mộc Organic. App dùng chung tài khoản CUSTOMER, sản phẩm, giỏ hàng, đơn hàng và điểm thưởng với website thông qua API Spring Boot.
+Ứng dụng Flutter dành cho khách hàng của hệ thống organicfood. App dùng chung tài khoản CUSTOMER, sản phẩm, giỏ hàng, đơn hàng và điểm thưởng với website thông qua API Spring Boot.
 
 ## Lấy mã và chuẩn bị môi trường
 
@@ -99,7 +99,12 @@ lib/
     promotions/presentation/      # Sản phẩm ưu đãi, chọn biến thể combo
     notifications/data/           # Inbox khách hàng
     notifications/presentation/   # Inbox, cập nhật đơn, ưu đãi
-    account/presentation/         # Hồ sơ và sổ địa chỉ
+    account/presentation/         # Hồ sơ, ảnh đại diện và sổ địa chỉ
+    feedback/data/, presentation/ # Phản hồi, tin nhắn, ảnh/video, đóng/mở lại
+    returns/data/, domain/, presentation/ # Yêu cầu đổi trả, phương án, hoàn/đổi
+    reviews/data/, presentation/  # Đánh giá đã mua, ảnh/video, xem/xóa/viết lại
+    favorites/presentation/       # Sản phẩm yêu thích trên ứng dụng
+    store_info/presentation/      # Thông tin cửa hàng, liên hệ và FAQ
   shared/
     navigation/                   # Mở màn hình và thông báo ngắn
     state/                        # Cấp store cho cây widget
@@ -114,7 +119,7 @@ Không gom màn hình mới vào một file `customer.dart` hoặc `shop.dart`. 
 
 Các màn hình mới gọi repository của chức năng; `OrganicStore` điều phối phiên và dữ liệu dùng chung. HTTP và refresh token dùng duy nhất `OrganicApi`. Backend quyết định giá, tồn kho, quyền truy cập, ưu đãi và trạng thái thanh toán. Không đọc trực tiếp database hoặc nhập mã React/Spring vào Flutter.
 
-Token, checkout và lần đổi voucher chưa rõ kết quả được lưu bằng `flutter_secure_storage`. Khi thử lại, app giữ nguyên payload và `Idempotency-Key`, kể cả sau khi khởi động lại. Dữ liệu riêng bị xóa khi đăng xuất/chuyển tài khoản. Làm mới tài khoản mỗi 30 giây khi app hoạt động; chi tiết đơn mỗi 20 giây và khi quay lại app. Đây là cập nhật trong app, chưa phải push nền.
+Token, checkout, lần đổi voucher và yêu cầu đổi trả chưa rõ kết quả được lưu bằng `flutter_secure_storage`. Khi thử lại, app giữ nguyên payload và `Idempotency-Key`, kể cả sau khi khởi động lại. Dữ liệu riêng bị xóa khi đăng xuất/chuyển tài khoản. Làm mới tài khoản mỗi 30 giây khi app hoạt động; chi tiết đơn mỗi 20 giây và khi quay lại app. Đây là cập nhật trong app, chưa phải push nền.
 
 ## Chức năng đã đồng bộ
 
@@ -125,8 +130,13 @@ Token, checkout và lần đổi voucher chưa rõ kết quả được lưu b�
 - Điểm khả dụng/đang giữ, lịch sử phân trang; đổi điểm lấy voucher, ví voucher và chọn voucher khi đặt hàng.
 - Ưu đãi công khai và combo: chọn biến thể, thêm toàn bộ combo bằng một thao tác nguyên tử; chỉ ghi nhớ mã sau khi thêm thành công.
 - Inbox khách hàng, trạng thái đọc được lưu phía backend; cập nhật đơn và ưu đãi với trạng thái đọc riêng theo tài khoản.
+- Phản hồi & hỗ trợ: tạo phản hồi chung hoặc theo đơn, xem danh sách/trạng thái, trao đổi tin nhắn, chọn ảnh/video từ điện thoại, xem/xóa tệp khi được phép, đóng/mở lại theo quyền backend.
+- Đổi trả & hoàn tiền: kiểm tra điều kiện và số lượng còn được yêu cầu, chọn sản phẩm/lý do/hình thức hỗ trợ, bắt buộc ảnh minh chứng; xem/chấp nhận/đề nghị xét lại phương án, bổ sung thông tin, hủy khi được phép; theo dõi nhận hàng thu hồi, tiền đã hoàn và đơn giao hàng đổi.
+- Đánh giá: danh sách sản phẩm đã mua/nhận đủ điều kiện, viết đánh giá kèm ảnh/video, lưu nháp phần chữ, xem trước, xem/xóa đánh giá của mình để viết lại; đọc/lọc/phân trang đánh giá công khai và tệp đính kèm trên sản phẩm.
+- Hồ sơ có tải/xóa ảnh đại diện và xóa địa chỉ. Sản phẩm yêu thích lưu riêng theo tài khoản trên ứng dụng; backend hiện không có API yêu thích để đồng bộ danh sách này với trình duyệt.
+- Thông báo phản hồi/đổi trả mở trực tiếp màn hình mobile tương ứng bằng ID, đánh dấu đọc theo luồng trên backend.
 
-Phạm vi giữ đúng ứng dụng khách hàng: sản phẩm, mua/theo dõi đơn, điểm/voucher, thông báo/ưu đãi; hồ sơ và địa chỉ phục vụ các luồng này. Các màn hình quản trị, kho, nhân viên, báo cáo không thuộc mobile.
+Phạm vi ứng dụng khách hàng đã được mở rộng theo yêu cầu thành viên: sản phẩm, mua/theo dõi đơn, điểm/voucher, thông báo/ưu đãi, hồ sơ/địa chỉ, yêu thích, đánh giá, phản hồi và đổi trả. Các màn hình quản trị, kho, nhân viên, báo cáo không thuộc mobile.
 
 ## Hợp đồng API cần đồng bộ với backend
 
@@ -141,7 +151,7 @@ flutter analyze
 flutter test
 ```
 
-Đợt đồng bộ ngày 05/11/2026: 24 test Flutter đạt, gồm khôi phục checkout/đổi voucher, đổi phiên, điều kiện voucher, danh sách cổng thanh toán và giao diện rộng 390px. Bộ test giỏ backend: 12/12; các test giỏ/checkout liên quan của frontend: 31/31. Các con số này là kiểm tra tự động, không phải kết quả thanh toán tiền thật.
+Đợt cập nhật ngày 05/11/2026 có 39 test Flutter: khôi phục checkout/voucher/đổi trả, giữ nguyên ảnh và mã yêu cầu sau lỗi mạng, kiểm tra phiên, gửi tệp sau refresh token, phương án đổi trả có phiên bản, phản hồi không gửi trùng nội dung, thông báo mở màn hình mobile và giao diện rộng 390px. Bộ test giỏ backend đã kiểm tra ở đợt trước: 12/12; frontend giỏ/checkout: 31/31. Các con số này là kiểm tra tự động, không phải kết quả giao dịch tiền thật.
 
 Đợt nghiệm thu local ngày 28–29/10/2026 ghi nhận 15 unit/widget test đạt; đã kiểm tra OTP thật, tìm kiếm/lọc, giỏ đồng bộ web, COD, trạng thái đơn, hủy đơn, tích/hoàn điểm, refresh/thu hồi phiên và khôi phục sau tắt app. Một số lượt harness cần chạy lại do locator hoặc thiếu bộ nhớ; không coi toàn bộ lượt integration test đều đạt.
 
@@ -151,7 +161,7 @@ flutter test
 
 - Push cho khách hàng khi app chạy nền/bị đóng và push khuyến mãi: backend hiện có luồng thiết bị FCM cho kho/nhân viên; chưa có hợp đồng push khách hàng. Mobile hiện dùng inbox và cập nhật khi app hoạt động.
 - Thanh toán có giao diện mở cổng và đối chiếu/capture; chưa nghiệm thu thanh toán tiền thật đầu cuối. Chưa có deep link riêng quay thẳng về app; sau khi thanh toán, người dùng quay lại app và kiểm tra kết quả. Thành công chỉ dựa trên phản hồi backend.
-- Upload avatar, viết đánh giá, phản hồi/đổi trả không nằm trong đợt đồng bộ này. App vẫn đọc đánh giá và nội dung inbox khách hàng.
+- Các luồng mới đã có kiểm thử hợp đồng/giao diện; nghiệm thu đầu cuối với tài khoản UAT, tệp thật và Cloudinary vẫn cần thực hiện trên môi trường của nhóm. Chọn ảnh/video qua trình chọn tệp hệ thống; ảnh/video trong bản nháp đánh giá cần chọn lại khi mở màn hình mới.
 - Release signing, thiết bị thật và iOS chưa được nghiệm thu. Không dùng khóa debug để phát hành store.
 
 ## Làm việc nhóm
@@ -161,3 +171,17 @@ Repo công khai cho phép mọi thành viên clone. Thành viên đã được c
 Tạo nhánh riêng cho từng việc, ví dụ `git switch -c feature/customer-push`, commit rồi mở pull request về `main`. Trước khi bắt đầu việc mới, cập nhật `main` bằng `git pull --ff-only`. Tránh thay `pubspec.lock` hoặc format hàng loạt khi không liên quan tới công việc.
 
 Font Be Vietnam Pro và Lora kèm giấy phép trong `assets/fonts/*-OFL.txt`. Các file cấu hình máy, khóa ký, build, dữ liệu và log local đã được loại khỏi Git.
+
+## Kiểm tra các chức năng khách hàng mới
+
+Tên hiển thị của ứng dụng là **organicfood** trên Flutter, Android, iOS và bản web. Sau khi đổi tên Android/iOS, Stop rồi Run/build lại; hot reload không cập nhật tên dưới biểu tượng. Giữ nguyên application ID và khóa phiên cũ để tài khoản hiện có không bị đăng xuất chỉ vì đổi thương hiệu.
+
+1. **Tài khoản → Phản hồi & hỗ trợ**: gửi nội dung, thêm ảnh/video, mở chi tiết để đọc/trả lời và xem trạng thái. Trong chi tiết đơn, chọn **Phản hồi về đơn hàng** để gắn đúng đơn.
+2. **Chi tiết đơn → Yêu cầu đổi trả / hoàn tiền**: chọn sản phẩm/số lượng còn được yêu cầu, nhập mô tả và thêm ảnh. Backend quyết định đơn có đủ điều kiện; đơn đã thanh toán bị hủy chỉ đề nghị hoàn tiền.
+3. **Tài khoản → Đổi trả & hoàn tiền**: xem phương án và từng dòng sản phẩm; chỉ đồng ý phương án đang hiển thị, hoặc yêu cầu xét lại/bổ sung/hủy theo quyền trả về. Thông tin được duyệt và tiền hoàn dự kiến khác với khoản hoàn đã thành công; app hiển thị riêng.
+4. Mất mạng khi gửi đổi trả: vào lại **Đổi trả & hoàn tiền → Kiểm tra yêu cầu chưa rõ kết quả**. Ảnh được lưu trong vùng riêng của app trên Android/iOS để thử lại cùng nội dung và key. Không thay nội dung khi lần gửi trước chưa rõ kết quả. Bản web chỉ giữ ảnh đang chờ trong bộ nhớ, cần đối chiếu danh sách trước khi tải lại trang/gửi mới.
+5. **Tài khoản → Đánh giá của tôi → Sản phẩm đã nhận**: viết đánh giá đủ điều kiện, chọn sao và gửi ảnh/video cùng lần gửi. Đánh giá đã gửi không sửa nội dung; có thể xóa rồi viết lại theo điều kiện backend.
+6. Chạm trái tim trong chi tiết sản phẩm để lưu yêu thích; vào **Tài khoản → Sản phẩm yêu thích**. Danh sách này lưu trên ứng dụng, riêng cho từng tài khoản.
+7. **Thông tin cá nhân**: tải/xóa ảnh đại diện. **Địa chỉ nhận hàng**: thêm/sửa/chọn mặc định qua form/xóa. **Thông tin & liên hệ cửa hàng** đọc địa chỉ, số liên hệ và FAQ do backend quản lý.
+
+API ảnh/video và avatar cần cấu hình Cloudinary phía backend giống website. Không đặt khóa dịch vụ trong mobile. Các màn hình trao đổi tải lại khi mở/refresh và khi app hoạt động; push nền vẫn cần backend khách hàng/FCM bổ sung.

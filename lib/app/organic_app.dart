@@ -12,7 +12,7 @@ class OrganicApp extends StatelessWidget {
   Widget build(BuildContext context) => StoreScope(
     store: store,
     child: MaterialApp(
-      title: 'Mộc Organic',
+      title: 'organicfood',
       debugShowCheckedModeBanner: false,
       theme: organicTheme(),
       locale: const Locale('vi'),

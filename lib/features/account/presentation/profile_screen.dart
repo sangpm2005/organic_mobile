@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 
+import 'widgets/avatar_editor.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -74,6 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: ListView(
         padding: const EdgeInsets.all(22),
         children: [
+          const AvatarEditor(),
           for (final e in {
             'fullName': 'Họ và tên',
             'phoneNumber': 'Số điện thoại',

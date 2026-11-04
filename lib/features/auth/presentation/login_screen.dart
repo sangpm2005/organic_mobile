@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Đăng nhập để tiếp tục hành trình sống lành cùng Mộc.',
+                  'Đăng nhập để tiếp tục hành trình sống lành cùng organicfood.',
                   style: TextStyle(color: muted),
                 ),
                 const SizedBox(height: 28),
@@ -146,7 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             );
                           }
                         },
-                  child: const Text('Chưa có tài khoản? Đăng ký cùng Mộc'),
+                  child: const Text(
+                    'Chưa có tài khoản? Đăng ký cùng organicfood',
+                  ),
                 ),
                 TextButton(
                   onPressed: busy

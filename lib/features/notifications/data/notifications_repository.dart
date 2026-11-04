@@ -9,4 +9,12 @@ class NotificationsRepository {
   );
   Future<void> read(String id) async =>
       api.request('PATCH', '/inbox/${Uri.encodeComponent(id)}/read');
+  Future<void> readThread({
+    String? feedbackId,
+    String? returnRequestId,
+  }) async => api.request(
+    'PATCH',
+    '/inbox/read-thread',
+    query: {'feedbackId': feedbackId, 'returnRequestId': returnRequestId},
+  );
 }

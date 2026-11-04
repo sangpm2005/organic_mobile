@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../store_info/presentation/store_info_screen.dart';
+
 import 'package:organic_mobile/features/promotions/presentation/promotions_screen.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/catalog/presentation/catalog_screen.dart';
@@ -134,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Heading(
               'Tươi lành mỗi ngày',
-              eyebrow: 'Ghé vườn nhà Mộc',
+              eyebrow: 'Ghé vườn nhà organicfood',
               trailing: TextButton(
                 onPressed: widget.catalog,
                 child: const Text('Xem hết →', style: TextStyle(fontSize: 11)),
@@ -198,7 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-            const Heading('Mộc chọn cho bạn', eyebrow: 'Sản phẩm nổi bật'),
+            const Heading(
+              'organicfood chọn cho bạn',
+              eyebrow: 'Sản phẩm nổi bật',
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 22),
               child: OutlinedButton.icon(
@@ -233,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     TextButton(
                       onPressed: () => open(context, const RewardsScreen()),
-                      child: const Text('Khám phá Mộc thành viên →'),
+                      child: const Text('Khám phá organicfood thành viên →'),
                     ),
                   ],
                 ),
@@ -242,10 +248,14 @@ class _HomeScreenState extends State<HomeScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(24, 4, 24, 28),
               child: Text(
-                'mộc.  ·  Một chút xanh, một đời lành.',
+                'organicfood  ·  Một chút xanh, một đời lành.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: muted, fontFamily: 'Lora'),
               ),
+            ),
+            TextButton(
+              onPressed: () => open(context, const StoreInfoScreen()),
+              child: const Text('Thông tin & liên hệ organicfood'),
             ),
           ],
         ),

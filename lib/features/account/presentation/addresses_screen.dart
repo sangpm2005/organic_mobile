@@ -49,6 +49,38 @@ class AddressesScreen extends StatelessWidget {
                           open(context, AddressForm(address: a), account: true),
                       child: const Text('Chỉnh sửa'),
                     ),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final yes = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Xóa địa chỉ này?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Giữ lại'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Xóa'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (yes != true) return;
+                        try {
+                          await store.api.request(
+                            'DELETE',
+                            '/customers/me/addresses/${Uri.encodeComponent('${a['id']}')}',
+                          );
+                          await store.refreshAccount(force: true);
+                        } catch (e) {
+                          if (context.mounted) toast(context, e);
+                        }
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Xóa địa chỉ'),
+                    ),
                   ],
                 ),
               ),
