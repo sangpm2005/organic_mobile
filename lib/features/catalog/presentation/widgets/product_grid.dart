@@ -9,22 +9,41 @@ class ProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (_, constraints) {
-      final columns = constraints.maxWidth > 650 ? 3 : 2;
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+      final columns =
+          constraints.maxWidth < 350 ||
+              MediaQuery.textScalerOf(context).scale(12) > 18
+          ? 1
+          : constraints.maxWidth > 650
+          ? 3
+          : 2;
+      return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 14,
-          mainAxisExtent: 290,
-        ),
-        itemCount: products.length,
-        itemBuilder: (_, i) => ProductTile(
-          products[i],
-          key: ValueKey('product.tile.${products[i].id}'),
-          onTap: () => onTap(products[i]),
+        child: Column(
+          children: [
+            for (var start = 0; start < products.length; start += columns)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var offset = 0; offset < columns; offset++) ...[
+                      if (offset > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: start + offset >= products.length
+                            ? const SizedBox()
+                            : ProductTile(
+                                products[start + offset],
+                                key: ValueKey(
+                                  'product.tile.${products[start + offset].id}',
+                                ),
+                                onTap: () => onTap(products[start + offset]),
+                              ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
         ),
       );
     },

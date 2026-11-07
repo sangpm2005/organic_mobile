@@ -93,14 +93,14 @@ class _AttachmentPickerState extends State<AttachmentPicker> {
           picking
               ? 'Đang chọn…'
               : widget.imagesOnly
-              ? 'Thêm ảnh minh chứng'
-              : 'Thêm ảnh / video',
+              ? 'Thêm ảnh đại diện'
+              : 'Thêm ảnh ',
         ),
       ),
       Text(
         widget.imagesOnly
             ? 'Tối đa 5 ảnh, mỗi ảnh 5 MB.'
-            : 'Tối đa 5 ảnh (5 MB/ảnh) và 1 video (50 MB).',
+            : 'Tối đa 5 ảnh (5 MB/ảnh) .',
         style: const TextStyle(fontSize: 11),
       ),
       for (var i = 0; i < widget.files.length; i++)

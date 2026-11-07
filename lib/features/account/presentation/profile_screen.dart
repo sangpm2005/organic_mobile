@@ -101,8 +101,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     return 'Email chưa hợp lệ.';
                   }
                   if (e.key == 'phoneNumber' &&
-                      !RegExp(r'^\+?[0-9]{9,15}$').hasMatch((v ?? '').trim())) {
-                    return 'Nhập số điện thoại có 9–15 chữ số.';
+                      !RegExp(r'^\+?[0-9]{9,10}$').hasMatch((v ?? '').trim())) {
+                    return 'Nhập số điện thoại có 10 chữ số.';
                   }
                   if (e.key == 'dateOfBirth' &&
                       (v ?? '').isNotEmpty &&

@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/organic_api.dart';
 import '../../../core/utils/json.dart';
 import 'google_identity.dart';
+import 'google_token_diagnostics.dart';
 
 class GoogleAuthRepository {
   final OrganicApi api;
@@ -88,28 +91,38 @@ class GoogleAuthRepository {
         await api.request('GET', '/customers/me');
         if (!active() || api.accessToken == null) return null;
       }
-      return object(
-        await api.request(
-          'POST',
-          link ? '/auth/google/link' : '/auth/google',
-          authenticated: false,
-          retry: false,
-          followRedirects: false,
-          headers: {
-            'Cookie': 'organic_google_auth=$cookie',
-            if (link) 'Authorization': 'Bearer ${api.accessToken}',
-          },
-          body: {
-            'credential': credential,
-            if (link)
-              'currentPassword': currentPassword!.isEmpty
-                  ? null
-                  : currentPassword
-            else
-              'rememberMe': true,
-          },
-        ),
-      );
+      try {
+        return object(
+          await api.request(
+            'POST',
+            link ? '/auth/google/link' : '/auth/google',
+            authenticated: false,
+            retry: false,
+            followRedirects: false,
+            headers: {
+              'Cookie': 'organic_google_auth=$cookie',
+              if (link) 'Authorization': 'Bearer ${api.accessToken}',
+            },
+            body: {
+              'credential': credential,
+              if (link)
+                'currentPassword': currentPassword!.isEmpty
+                    ? null
+                    : currentPassword
+              else
+                'rememberMe': true,
+            },
+          ),
+        );
+      } on ApiException catch (error) {
+        if (kDebugMode && error.status == 401) {
+          debugPrint(
+            '[GoogleAuth] Backend rejected credential; unverified checks: '
+            '${googleTokenDiagnostics(credential, clientId: clientId, nonce: nonce)}',
+          );
+        }
+        rethrow;
+      }
     } finally {
       // The challenge cookie and Google ID token only live for this attempt.
       cookie = null;

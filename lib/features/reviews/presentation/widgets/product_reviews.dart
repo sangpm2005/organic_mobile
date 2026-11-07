@@ -72,6 +72,7 @@ class _ProductReviewsState extends State<ProductReviews> {
       DropdownButtonFormField<int>(
         initialValue: rating ?? 0,
         isExpanded: true,
+        style: Theme.of(context).textTheme.bodyMedium,
         decoration: const InputDecoration(labelText: 'Lọc theo số sao'),
         items: [
           const DropdownMenuItem(value: 0, child: Text('Tất cả đánh giá')),
@@ -85,10 +86,11 @@ class _ProductReviewsState extends State<ProductReviews> {
                 load(reset: true);
               },
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 24),
       DropdownButtonFormField<String>(
         initialValue: sort,
         isExpanded: true,
+        style: Theme.of(context).textTheme.bodyMedium,
         decoration: const InputDecoration(labelText: 'Sắp xếp đánh giá'),
         items: const [
           DropdownMenuItem(value: 'newest', child: Text('Mới nhất')),
@@ -102,6 +104,7 @@ class _ProductReviewsState extends State<ProductReviews> {
                 load(reset: true);
               },
       ),
+      const SizedBox(height: 12),
       for (final r in rows)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),

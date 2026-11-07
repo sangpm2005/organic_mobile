@@ -43,9 +43,13 @@ flutter run -d <ANDROID_DEVICE_ID> --dart-define=API_BASE_URL=https://YOUR_BACKE
 
 App chỉ cho phép tài khoản **CUSTOMER**. Tạo tài khoản qua OTP hoặc dùng tài khoản phát triển do nhóm cung cấp. SendGrid, Cloudinary, JWT và các khóa thanh toán nằm phía backend; không đưa vào Dart, assets hoặc `--dart-define`.
 
-Mobile có đăng nhập và liên kết Google qua API sẵn có. Xem [cấu hình OAuth Android/iOS](docs/google-sign-in.md); Web Client ID của backend chưa thay thế đăng ký package/SHA-1 cho Android.
+Mobile có đăng nhập và liên kết Google qua API sẵn có. Web Client ID được khai báo trong `lib/core/config/google_auth_config.dart` và đối chiếu với challenge của backend. Xem [cấu hình OAuth Android/iOS](docs/google-sign-in.md); vẫn cần đăng ký package/SHA-1 cho Android.
 
 VietQR và PayPal là hai lựa chọn riêng trong bước đặt hàng. VietQR mở trang QR của payOS bằng trình duyệt trong ứng dụng (hoặc trình duyệt ngoài nếu thiết bị không hỗ trợ); PayPal mở trang chấp thuận PayPal riêng. Mobile dùng đường dẫn thanh toán API trả về, không tự tạo mã chuyển khoản hoặc tự đánh dấu đã thu tiền. Khi hủy đơn, app giữ nguyên lỗi API để người dùng đọc và chỉ cập nhật thành đã hủy sau phản hồi thành công từ máy chủ.
+
+Logo các cổng thanh toán được đóng gói trong `assets/images/payments/`, dùng cùng ảnh với `organic_frontend/public/images/payments/` (COD dùng biểu tượng tiền mặt). Giỏ hàng có nhập mã, chọn từ ví và bỏ voucher. Nếu đã có thông tin nhận hàng, mobile gọi `/checkout/preview` để hiển thị khoản giảm do backend xác nhận; nếu chưa có, mã được giữ sang bước đặt hàng và được ghi rõ là mới chọn, chưa áp dụng. Khi giỏ hoặc địa chỉ thay đổi, bảng giá cũ không còn được dùng. Voucher khách đã chọn được giữ khi đăng nhập; mã riêng của tài khoản được xóa khỏi mobile khi đăng xuất. Các khoản giảm bằng không hiển thị `0 đ`.
+
+Ví chọn voucher tải đủ các trang trước khi xếp hạng theo giỏ hàng. Voucher phù hợp lên trước, sắp theo số tiền giảm có tính trần giảm và phạm vi sản phẩm; nếu đã có thông tin nhận hàng, mức giảm được đối chiếu bằng preview. Các voucher chưa phù hợp nằm bên dưới. Khi giỏ thay đổi, danh sách được xếp lại; bấm sử dụng voucher không phù hợp chỉ báo lỗi và giữ mã đang chọn, không hiển thị số tiền còn thiếu. Giá cuối cùng vẫn được backend xác nhận khi đặt hàng.
 
 ### Điện thoại Android thật qua USB
 
@@ -74,7 +78,9 @@ Build APK debug:
 flutter build apk --debug
 ```
 
-APK ở `build/app/outputs/flutter-apk/app-debug.apk`. HTTP được cho phép trong Android debug; bản release cần HTTPS và cấu hình ký riêng. Cấu hình release hiện dùng khóa debug của template, chưa dùng để phát hành lên store. iOS mới có scaffold, chưa được build/kiểm tra trên Windows.
+Nếu Java/Gradle báo `Unable to establish loopback connection` trên Windows, có thể dùng `./scripts/build-debug.ps1`. Script chỉ đổi thư mục tạm của Java trong tiến trình build và khôi phục biến môi trường sau đó. Có thể truyền `-ApiBaseUrl https://YOUR_BACKEND/api/v1` khi cần máy chủ khác.
+
+APK ở `build/app/outputs/flutter-apk/app-debug.apk`. HTTP được cho phép trong Android debug; release cần HTTPS và khóa ký riêng qua `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Thiếu file, build release dừng thay vì ký bằng khóa debug. Không đưa khóa hoặc key.properties lên Git. iOS chưa build/kiểm tra trên Windows.
 
 ## Chạy trên trình duyệt
 
@@ -173,8 +179,8 @@ flutter test
 
 ## Giới hạn và phần triển khai tiếp
 
-- Push cho khách hàng khi app chạy nền/bị đóng và push khuyến mãi: backend hiện có luồng thiết bị FCM cho kho/nhân viên; chưa có hợp đồng push khách hàng. Mobile hiện dùng inbox và cập nhật khi app hoạt động.
-- Thanh toán có giao diện mở cổng và đối chiếu/capture; chưa nghiệm thu thanh toán tiền thật đầu cuối. Chưa có deep link riêng quay thẳng về app; sau khi thanh toán, người dùng quay lại app và kiểm tra kết quả. Thành công chỉ dựa trên phản hồi backend.
+- Push khách hàng đã có code đăng ký/gỡ thiết bị, bật/tắt, nhận và mở thông báo theo backend mới. Chưa có file Firebase Android nên chưa nghiệm thu push thật. Xem [cấu hình push](docs/mobile-push-setup.md). Khuyến mãi chưa có chiến dịch push hàng loạt phía backend.
+- Thanh toán có giao diện mở cổng và tự đối chiếu/capture khi khách quay lại chi tiết đơn; chưa nghiệm thu giao dịch thật đầu cuối. Chưa có deep link riêng quay thẳng về app. Thành công chỉ dựa trên backend.
 - Các luồng mới đã có kiểm thử hợp đồng/giao diện; nghiệm thu đầu cuối với tài khoản UAT, tệp thật và Cloudinary vẫn cần thực hiện trên môi trường của nhóm. Chọn ảnh/video qua trình chọn tệp hệ thống; ảnh/video trong bản nháp đánh giá cần chọn lại khi mở màn hình mới.
 - Release signing, thiết bị thật và iOS chưa được nghiệm thu. Không dùng khóa debug để phát hành store.
 
@@ -198,4 +204,8 @@ Tên hiển thị của ứng dụng là **organicfood** trên Flutter, Android,
 6. Chạm trái tim trong chi tiết sản phẩm để lưu yêu thích; vào **Tài khoản → Sản phẩm yêu thích**. Danh sách này lưu trên ứng dụng, riêng cho từng tài khoản.
 7. **Thông tin cá nhân**: tải/xóa ảnh đại diện. **Địa chỉ nhận hàng**: thêm/sửa/chọn mặc định qua form/xóa. **Thông tin & liên hệ cửa hàng** đọc địa chỉ, số liên hệ và FAQ do backend quản lý.
 
-API ảnh/video và avatar cần cấu hình Cloudinary phía backend giống website. Không đặt khóa dịch vụ trong mobile. Các màn hình trao đổi tải lại khi mở/refresh và khi app hoạt động; push nền vẫn cần backend khách hàng/FCM bổ sung.
+API ảnh/video và avatar cần cấu hình Cloudinary phía backend giống website. Không đặt khóa dịch vụ trong mobile. Các màn hình trao đổi tải lại khi mở/refresh và khi app hoạt động; push nền cần cấu hình Firebase đúng project, code đã nối với API khách hàng mới.
+
+## Phần hoàn thiện ngày 06/11/2026
+
+Xem [đối chiếu yêu cầu và demo](docs/mobile-completion-20261106.md): đổi/quên mật khẩu OTP, sản phẩm giảm giá, chính sách trong app, đối chiếu thanh toán tự động và thông báo khách hàng. Không thay đổi backend hoặc SQL trong lần bổ sung mobile.

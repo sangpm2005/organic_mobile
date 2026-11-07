@@ -6,6 +6,7 @@ import 'package:organic_mobile/shared/theme/organic_theme.dart';
 import 'package:organic_mobile/shared/widgets/brand.dart';
 
 import '../../account/presentation/profile_screen.dart';
+import 'password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,7 +61,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final store = StoreScope.of(context);
     try {
       final accepted = await store.loginWithGoogle(isActive: () => mounted);
-      if (!accepted || !mounted) return;
+      if (!mounted) return;
+      if (!accepted) {
+        setState(
+          () => error = 'Đăng nhập Google chưa hoàn tất. Nếu bạn đã chọn tài khoản mà vẫn quay lại đây, hãy kiểm tra cấu hình đăng nhập Google của ứng dụng.',
+        );
+        return;
+      }
       if (store.profileCompletionRequired) {
         toast(context, 'Bổ sung số điện thoại để hoàn tất hồ sơ khách hàng.');
         await open(context, const ProfileScreen());
@@ -156,6 +163,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => open(context, const PasswordScreen()),
+                    child: const Text('Quên mật khẩu?'),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: busy ? null : submit,

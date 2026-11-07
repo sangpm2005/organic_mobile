@@ -4,7 +4,6 @@ import '../../../../core/utils/json.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/state/store_scope.dart';
 import '../../../../shared/navigation/navigation.dart';
-import '../../../auth/presentation/widgets/login_gate.dart';
 import '../../../catalog/presentation/product_screen.dart';
 
 class PromotionProducts extends StatefulWidget {
@@ -34,7 +33,7 @@ class _PromotionProductsState extends State<PromotionProducts> {
 
   Future<void> add() async {
     final store = StoreScope.of(context);
-    if (!await ensureLogin(context) || !mounted) return;
+    if (busy) return;
     setState(() => busy = true);
     try {
       await store.addBatch(

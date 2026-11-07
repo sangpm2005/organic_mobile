@@ -6,8 +6,49 @@ import 'package:organic_mobile/core/network/api_exception.dart';
 import 'package:organic_mobile/features/checkout/presentation/widgets/payment_methods.dart';
 import 'package:organic_mobile/features/orders/domain/payment_policy.dart';
 import 'package:organic_mobile/features/orders/presentation/payment_launcher.dart';
+import 'package:organic_mobile/features/checkout/presentation/widgets/payment_brand.dart';
+import 'package:organic_mobile/shared/theme/organic_theme.dart';
 
 void main() {
+  for (final width in [320.0, 390.0]) {
+    testWidgets('all payment logos render with full labels at ${width}px', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: organicTheme(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: PaymentMethods(
+                available: const {
+                  'cod': true,
+                  'payos': true,
+                  'paypal': true,
+                  'vnpay': true,
+                  'stripe': true,
+                },
+                value: 'cod',
+                onChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PaymentBrand), findsNWidgets(5));
+      for (final gateway in ['cod', 'payos', 'paypal', 'vnpay', 'stripe']) {
+        expect(find.byKey(ValueKey('payment.brand.$gateway')), findsOneWidget);
+      }
+      expect(find.text('VietQR'), findsOneWidget);
+      expect(find.text('Thẻ quốc tế (Stripe)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     'VietQR and PayPal are separate choices with exactly one selection',
     (tester) async {

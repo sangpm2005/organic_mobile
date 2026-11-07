@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -5,7 +7,16 @@ plugins {
 }
 
 // Acceptance builds use their own Android sandbox and preserve the normal app.
+// Keep unconfigured builds usable; the settings screen explains missing FCM setup.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val organicAcceptanceBuild = providers.environmentVariable("ORGANIC_UAT").orNull == "1"
+val signingFile = rootProject.file("key.properties")
+val releaseKeys = Properties().apply {
+    if (signingFile.exists()) signingFile.inputStream().use { load(it) }
+}
 
 android {
     namespace = "vn.huit.organic_mobile"
@@ -33,12 +44,27 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (signingFile.exists()) {
+            create("release") {
+                keyAlias = releaseKeys.getProperty("keyAlias")
+                keyPassword = releaseKeys.getProperty("keyPassword")
+                storeFile = file(releaseKeys.getProperty("storeFile"))
+                storePassword = releaseKeys.getProperty("storePassword")
+            }
+        }
+    }
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (signingFile.exists()) signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+// Never accidentally distribute a release signed with the template debug key.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project == project && it.name.contains("Release") } && !signingFile.exists()) {
+        throw GradleException("Release requires android/key.properties and a private signing key. Use a debug build for local demos.")
     }
 }
 

@@ -39,7 +39,8 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
   bool loading = false, busy = false;
   bool active = true;
   Future<void>? _loadPending;
-  String? actionError;
+  String? actionError, paymentSyncError;
+  DateTime? lastPaymentSync;
   @override
   void initState() {
     super.initState();
@@ -87,7 +88,31 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
     final account = store!.user?['accountId'];
     loading = true;
     try {
-      final result = await store!.orderService.detail(widget.id);
+      var result = await store!.orderService.detail(widget.id);
+      if (!mounted) return;
+      final version = store!.api.sessionVersion;
+      if (!busy &&
+          active &&
+          (ModalRoute.of(context)?.isCurrent ?? true) &&
+          canPayOrder(result) &&
+          (lastPaymentSync == null ||
+              DateTime.now().difference(lastPaymentSync!) >=
+                  const Duration(seconds: 15))) {
+        lastPaymentSync = DateTime.now();
+        try {
+          await store!.orderService.reconcile(result);
+          if (!mounted ||
+              !store!.loggedIn ||
+              store!.api.sessionVersion != version) {
+            return;
+          }
+          result = await store!.orderService.detail(widget.id);
+          paymentSyncError = null;
+        } catch (_) {
+          paymentSyncError =
+              'Chưa cập nhật được thanh toán. Hệ thống sẽ tự kiểm tra lại.';
+        }
+      }
       if (mounted && store!.loggedIn && store!.user?['accountId'] == account) {
         setState(() {
           order = result;
@@ -186,74 +211,6 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() => busy = false);
       }
-    }
-  }
-
-  Future<void> verifyPayment() async {
-    if (busy) return;
-    final paypal = order?['paymentMethod'] == 'paypal';
-    setState(() {
-      busy = true;
-      actionError = null;
-    });
-    try {
-      if (paypal) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Xác nhận thanh toán PayPal'),
-            content: const Text(
-              'Bạn đã chấp thuận thanh toán trên PayPal? Ứng dụng sẽ yêu cầu máy chủ kiểm tra và hoàn tất thu tiền nếu giao dịch đã được chấp thuận.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Chưa'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Đã chấp thuận'),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true || !mounted) return;
-      }
-      final latest = await store!.orderService.detail(widget.id);
-      final payment = objects(latest['payments'])
-          .where(
-            (p) =>
-                p['gateway'] == latest['paymentMethod'] &&
-                [
-                  'pending',
-                  'creating',
-                  'capturing',
-                  'closing',
-                ].contains(p['status']),
-          )
-          .firstOrNull;
-      if (payment != null && latest['paymentStatus'] != 'paid') {
-        final checked = await store!.orderService.sync('${payment['id']}');
-        if (paypal &&
-            checked['gateway'] == 'paypal' &&
-            ['pending', 'capturing'].contains(checked['status'])) {
-          await store!.orderService.capturePaypal('${payment['id']}');
-        }
-      }
-      await load(force: true);
-      await store!.refreshAccount(force: true);
-      if (mounted) {
-        toast(
-          context,
-          order?['paymentStatus'] == 'paid'
-              ? 'Máy chủ đã xác nhận thanh toán.'
-              : 'Chưa có xác nhận thanh toán thành công. Vui lòng kiểm tra lại sau.',
-        );
-      }
-    } catch (e) {
-      if (mounted) setState(() => actionError = '$e');
-    } finally {
-      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -387,14 +344,9 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                   if (canPayOrder(order!) &&
                       order!['paymentMethod'] != 'cod') ...[
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: busy ? null : verifyPayment,
-                      icon: const Icon(Icons.verified_outlined),
-                      label: Text(
-                        order!['paymentMethod'] == 'paypal'
-                            ? 'Xác nhận thanh toán PayPal'
-                            : 'Kiểm tra thanh toán',
-                      ),
+                    Text(
+                      paymentSyncError ?? 'Thanh toán được kiểm tra tự động khi bạn quay lại ứng dụng.',
+                      style: const TextStyle(color: muted),
                     ),
                   ],
                   if (order!['paymentDueAt'] != null &&

@@ -10,6 +10,7 @@ import '../../../shared/state/store_scope.dart';
 import '../../../shared/widgets/panel.dart';
 import '../../../shared/widgets/paged_records.dart';
 import 'widgets/voucher_card.dart';
+import '../domain/voucher_recommendation.dart';
 
 class RewardsScreen extends StatefulWidget {
   const RewardsScreen({super.key});
@@ -195,6 +196,17 @@ class _RewardsScreenState extends State<RewardsScreen> {
                                 ? null
                                 : TextButton(
                                     onPressed: () {
+                                      if (!VoucherRecommendation.forCart(
+                                        p,
+                                        store.cartItems,
+                                        number(store.cart?['subtotal']),
+                                      ).fitsCart) {
+                                        toast(
+                                          context,
+                                          'Voucher không phù hợp với giỏ hàng hiện tại.',
+                                        );
+                                        return;
+                                      }
                                       store.selectVoucher(
                                         '${p['voucherCode']}',
                                       );

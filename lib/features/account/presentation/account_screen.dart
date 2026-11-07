@@ -13,12 +13,17 @@ import 'package:organic_mobile/shared/widgets/heading.dart';
 import 'package:organic_mobile/shared/widgets/panel.dart';
 
 import '../../store_info/presentation/store_info_screen.dart';
+import '../../store_info/presentation/contact_screen.dart';
 
 import '../../feedback/presentation/feedback_list_screen.dart';
 import '../../returns/presentation/returns_screen.dart';
 import '../../reviews/presentation/reviews_screen.dart';
 import '../../favorites/presentation/favorites_screen.dart';
 import '../../auth/presentation/google_link_screen.dart';
+import '../../auth/presentation/password_screen.dart';
+import '../../auth/data/password_repository.dart';
+import '../../notifications/presentation/push_settings.dart';
+import '../../store_info/presentation/policies_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -26,8 +31,24 @@ class AccountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = StoreScope.of(context);
     if (!store.loggedIn) {
-      return const LoginGate(
-        'Một tài khoản, cùng giỏ hàng và điểm thưởng trên web lẫn app.',
+      return ListView(
+        children: [
+          const LoginGate(
+            'Một tài khoản, cùng giỏ hàng và điểm thưởng trên web lẫn app.',
+          ),
+          ListTile(
+            leading: const Icon(Icons.storefront_outlined),
+            title: const Text('Về cửa hàng organicfood'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const StoreInfoScreen()),
+          ),
+          ListTile(
+            leading: const Icon(Icons.support_agent_outlined),
+            title: const Text('Thông tin liên hệ'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const ContactScreen()),
+          ),
+        ],
       );
     }
     return RefreshIndicator(
@@ -133,7 +154,7 @@ class AccountScreen extends StatelessWidget {
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
             leading: const Icon(Icons.loyalty_outlined, color: moss),
-            title: const Text('Điểm xanh & ưu đãi'),
+            title: const Text('Điểm tích luỹ  & ưu đãi'),
             subtitle: Text('${store.rewards?['available'] ?? 0} điểm khả dụng'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => open(context, const RewardsScreen()),
@@ -155,9 +176,13 @@ class AccountScreen extends StatelessWidget {
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
             leading: const Icon(Icons.notifications_none, color: moss),
-            title: const Text('Cập nhật đơn hàng'),
+            title: const Text('Thông báo & cập nhật'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => open(context, const UpdatesScreen()),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: PushSettings(),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -166,9 +191,35 @@ class AccountScreen extends StatelessWidget {
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
             leading: const Icon(Icons.support_agent_outlined, color: moss),
-            title: const Text('Thông tin & liên hệ cửa hàng'),
-            subtitle: const Text('Địa chỉ, giờ mở cửa và câu hỏi thường gặp'),
+            title: const Text('Thông tin liên hệ'),
+            subtitle: const Text('Điện thoại, email, địa chỉ và giờ mở cửa'),
+            onTap: () => open(context, const ContactScreen()),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 26),
+            leading: const Icon(Icons.storefront_outlined, color: moss),
+            title: const Text('Về cửa hàng organicfood'),
+            subtitle: const Text('Nguồn gốc, chứng nhận và câu hỏi thường gặp'),
             onTap: () => open(context, const StoreInfoScreen()),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 26),
+            leading: const Icon(Icons.policy_outlined, color: moss),
+            title: const Text('Chính sách & hướng dẫn'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(context, const PoliciesScreen()),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 26),
+            leading: const Icon(Icons.lock_reset_outlined, color: moss),
+            title: const Text('Đổi mật khẩu'),
+            subtitle: const Text('Xác thực qua email để đặt mật khẩu mới'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => open(
+              context,
+              const PasswordScreen(purpose: PasswordPurpose.change),
+              account: true,
+            ),
           ),
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 26),
@@ -192,7 +243,11 @@ class AccountScreen extends StatelessWidget {
                 ),
               );
               if (ok == true) {
-                await store.logout();
+                try {
+                  await store.logout();
+                } catch (e) {
+                  if (context.mounted) toast(context, e);
+                }
               }
             },
           ),

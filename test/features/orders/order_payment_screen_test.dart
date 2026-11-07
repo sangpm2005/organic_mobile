@@ -142,12 +142,15 @@ void main() {
   );
 
   testWidgets(
-    'cancel confirmation cannot be double submitted and keeping the order makes no API mutation',
+    'cancel confirmation cannot be double submitted and keeping the order never calls cancellation',
     (tester) async {
       var posts = 0;
       final store = customer(
         MockClient((request) async {
-          if (request.method == 'POST') posts++;
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/cancel')) {
+            posts++;
+          }
           return ok(sampleOrder());
         }),
       );

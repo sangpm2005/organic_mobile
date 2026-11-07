@@ -7,7 +7,7 @@ class ProductPhoto extends StatelessWidget {
   const ProductPhoto(this.url, {super.key, this.height});
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: sage,
+    color: Colors.white,
     child: url.isEmpty
         ? SizedBox(
             height: height,
@@ -15,15 +15,18 @@ class ProductPhoto extends StatelessWidget {
               child: Icon(Icons.eco_outlined, size: 45, color: moss),
             ),
           )
-        : Image.network(
-            url,
-            height: height,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (_, error, stack) => SizedBox(
+        : Padding(
+            padding: const EdgeInsets.all(8),
+            child: Image.network(
+              url,
               height: height,
-              child: const Center(
-                child: Icon(Icons.eco_outlined, size: 45, color: moss),
+              width: double.infinity,
+              fit: BoxFit.contain,
+              errorBuilder: (_, error, stack) => SizedBox(
+                height: height,
+                child: const Center(
+                  child: Icon(Icons.eco_outlined, size: 45, color: moss),
+                ),
               ),
             ),
           ),

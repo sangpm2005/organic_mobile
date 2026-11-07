@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:organic_mobile/core/utils/formatters.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/auth/presentation/widgets/login_gate.dart';
-import 'package:organic_mobile/features/catalog/presentation/widgets/product_photo.dart';
+import 'package:organic_mobile/features/catalog/domain/product_detail.dart';
+import 'package:organic_mobile/features/catalog/presentation/widgets/product_gallery.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/theme/organic_theme.dart';
@@ -42,8 +43,9 @@ class _ProductScreenState extends State<ProductScreen> {
     } catch (_) {
       availability = null;
     }
-    final variants = objects(detail['variants']);
-    selected ??=
+    final variants = sellableVariants(detail);
+    selected =
+        variants.where((v) => v['id'] == selected?['id']).firstOrNull ??
         variants
             .where((v) => v['id'] == detail['defaultVariantId'])
             .firstOrNull ??
@@ -52,7 +54,7 @@ class _ProductScreenState extends State<ProductScreen> {
   }
 
   Future<void> add() async {
-    if (!await ensureLogin(context) || selected == null || !mounted) {
+    if (adding || selected == null || !mounted) {
       return;
     }
     setState(() => adding = true);
@@ -97,17 +99,20 @@ class _ProductScreenState extends State<ProductScreen> {
     body: AsyncView<Json>(
       load: load,
       builder: (data) {
-        final variants = objects(data['variants']);
-        final image = objects(data['images']).firstOrNull?['imageUrl'] ?? '';
+        final variants = sellableVariants(data);
+        final images = productImages(
+          data,
+          baseUrl: StoreScope.of(context).api.baseUrl,
+        );
         final stock = object(
           availability?['availableQuantity'],
         )[selected?['id']];
         return ListView(
           padding: const EdgeInsets.fromLTRB(22, 0, 22, 30),
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: ProductPhoto('$image', height: 300),
+            ProductGallery(
+              images,
+              key: ValueKey('product.gallery.${widget.id}'),
             ),
             const SizedBox(height: 22),
             Text(
@@ -132,8 +137,21 @@ class _ProductScreenState extends State<ProductScreen> {
                 ),
               ),
             const SizedBox(height: 15),
+            if (selected != null &&
+                number(selected?['compareAtPrice']) >
+                    number(selected?['sellingPrice']))
+              Text(
+                money(selected?['compareAtPrice']),
+                style: const TextStyle(
+                  color: muted,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
             Text(
-              money(selected?['sellingPrice'] ?? data['minPrice']),
+              selected == null
+                  ? 'Hiện chưa có quy cách đang bán'
+                  : money(selected?['sellingPrice']),
+              key: const ValueKey('product.price'),
               style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w600,
@@ -141,6 +159,13 @@ class _ProductScreenState extends State<ProductScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            if (variants.isNotEmpty) ...[
+              const Text(
+                'Chọn khối lượng / dung tích',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+            ],
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -148,12 +173,14 @@ class _ProductScreenState extends State<ProductScreen> {
                   .map(
                     (v) => ChoiceChip(
                       key: ValueKey('product.variant.${v['id']}'),
-                      label: Text('${v['variantName']}'),
+                      label: Text(variantDisplayName(v)),
                       selected: selected?['id'] == v['id'],
-                      onSelected: (_) => setState(() {
-                        selected = v;
-                        quantity = 1;
-                      }),
+                      onSelected: adding
+                          ? null
+                          : (_) => setState(() {
+                              selected = v;
+                              quantity = 1;
+                            }),
                     ),
                   )
                   .toList(),
@@ -162,36 +189,46 @@ class _ProductScreenState extends State<ProductScreen> {
             Text(
               stock == null
                   ? 'Tồn kho được kiểm tra khi thêm vào giỏ và đặt hàng.'
-                  : 'Có thể mua: $stock gói',
+                  : 'Có thể mua: $stock sản phẩm theo quy cách đã chọn',
+              key: const ValueKey('product.stock'),
               style: const TextStyle(color: muted, fontSize: 11),
             ),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                IconButton(
-                  key: const ValueKey('product.decrease'),
-                  onPressed: quantity > 1
-                      ? () => setState(() => quantity--)
-                      : null,
-                  icon: const Icon(Icons.remove_circle_outline),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      key: const ValueKey('product.decrease'),
+                      onPressed: !adding && quantity > 1
+                          ? () => setState(() => quantity--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Text('$quantity'),
+                    IconButton(
+                      key: const ValueKey('product.increase'),
+                      onPressed:
+                          !adding &&
+                              quantity < 999 &&
+                              (stock == null || quantity < number(stock))
+                          ? () => setState(() => quantity++)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
                 ),
-                Text('$quantity'),
-                IconButton(
-                  key: const ValueKey('product.increase'),
-                  onPressed:
-                      quantity < 999 &&
-                          (stock == null || quantity < number(stock))
-                      ? () => setState(() => quantity++)
-                      : null,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
+                SizedBox(
+                  width: double.infinity,
                   child: FilledButton.icon(
                     key: const ValueKey('product.add'),
                     onPressed:
                         adding ||
                             selected == null ||
-                            stock == 0 ||
+                            (stock != null && number(stock) <= 0) ||
                             data['canAddToCart'] == false
                         ? null
                         : add,
@@ -282,6 +319,7 @@ class _ProductScreenState extends State<ProductScreen> {
               '${object(data['reviewSummary'])['totalReviews'] ?? 0} đánh giá · ${object(data['reviewSummary'])['averageRating'] ?? 'Chưa có điểm'} / 5',
               style: const TextStyle(color: muted),
             ),
+            const SizedBox(height: 20),
             ProductReviews(widget.id, revision: reviewRevision),
             TextButton.icon(
               onPressed: () async {

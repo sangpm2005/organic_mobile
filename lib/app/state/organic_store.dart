@@ -9,6 +9,7 @@ import '../../core/network/organic_api.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/utils/json.dart';
 import '../../features/catalog/domain/product.dart';
+import '../../features/cart/data/cart_repository.dart';
 import '../../features/checkout/data/checkout_repository.dart';
 import '../../features/orders/data/orders_repository.dart';
 import '../../features/orders/domain/order_labels.dart';
@@ -23,12 +24,16 @@ import '../../core/media/upload_file.dart';
 import '../../shared/media/media_validation.dart';
 import '../../features/auth/data/google_auth_repository.dart';
 import '../../features/auth/data/google_identity.dart';
+import '../../features/notifications/data/customer_push.dart';
+import '../../features/notifications/data/push_gateway.dart';
 
 class OrganicStore extends ChangeNotifier {
   final OrganicApi api;
   final FlutterSecureStorage storage;
   final ReturnDraftFiles returnDraftFiles;
   late final GoogleAuthRepository googleAuth;
+  late final CustomerPush push;
+  late final cartService = CartRepository(api, storage);
   late final feedbackService = FeedbackRepository(api);
   late final returnsService = ReturnsRepository(api);
   late final reviewService = ReviewsRepository(api);
@@ -68,10 +73,17 @@ class OrganicStore extends ChangeNotifier {
     FlutterSecureStorage? storage,
     ReturnDraftFiles? returnDraftFiles,
     GoogleIdentity? googleIdentity,
+    PushGateway? pushGateway,
   }) : api = api ?? OrganicApi(),
        storage = storage ?? const FlutterSecureStorage(),
        returnDraftFiles = returnDraftFiles ?? ReturnDraftFiles() {
     googleAuth = GoogleAuthRepository(this.api, identity: googleIdentity);
+    push = CustomerPush(
+      this.api,
+      this.storage,
+      () => loggedIn ? '${user?['accountId'] ?? ''}' : null,
+      gateway: pushGateway,
+    );
     this.api.onSessionChanged = _saveSession;
   }
   bool get loggedIn => user != null && api.accessToken != null;
@@ -81,21 +93,44 @@ class OrganicStore extends ChangeNotifier {
       '${profile?['phoneNumber'] ?? user?['phoneNumber'] ?? ''}'.trim().isEmpty;
   int get cartCount => (cart?['totalQuantity'] as num?)?.toInt() ?? 0;
   List<Json> get cartItems => objects(cart?['items']);
-  List<Product> get featured =>
-      objects(home['featuredProducts']).map(Product.fromJson).toList();
+  List<Product> get featured {
+    final seen = <String>{};
+    return [
+      ...objects(home['featuredProducts']),
+      ...objects(home['newProducts']),
+      ...objects(home['certifiedProducts']),
+    ].map(Product.fromJson).where((p) => seen.add(p.id)).take(8).toList();
+  }
+
+  List<Product> get discounted {
+    final seen = <String>{};
+    return objects(home['discountedProducts'])
+        .map(Product.fromJson)
+        .where((p) => p.price > 0 && p.comparePrice > p.price && seen.add(p.id))
+        .take(8)
+        .toList();
+  }
+
   String updateKey(Json order) =>
       '${order['id']}:${order['status']}:${order['paymentStatus']}';
-  List<Json> get updates =>
-      [
-        ...inbox.map(
-          (n) => {
-            ...n,
-            'key': 'inbox:${n['id']}',
-            'kind': 'inbox',
-            'read': n['readAt'] != null,
-          },
-        ),
-        ...orders.map(
+  List<Json> get updates => [
+    ...inbox.map(
+      (n) => {
+        ...n,
+        'key': 'inbox:${n['id']}',
+        'kind': 'inbox',
+        'read': n['readAt'] != null,
+      },
+    ),
+    ...orders
+        .where(
+          (o) => !inbox.any(
+            (n) =>
+                n['category'] == 'order' &&
+                notificationDestination(n)?.id == o['id'],
+          ),
+        )
+        .map(
           (o) => {
             'key': updateKey(o),
             'kind': 'order',
@@ -107,22 +142,19 @@ class OrganicStore extends ChangeNotifier {
             'read': readUpdates.contains(updateKey(o)),
           },
         ),
-        ...promotions.map(
-          (p) => {
-            'key': 'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
-            'kind': 'promotion',
-            'title': p['name'],
-            'message': p['description'] ?? 'Ưu đãi mới từ organicfood',
-            'createdAt': p['startDate'],
-            'read': readUpdates.contains(
-              'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
-            ),
-          },
+    ...promotions.map(
+      (p) => {
+        'key': 'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
+        'kind': 'promotion',
+        'title': p['name'],
+        'message': p['description'] ?? 'Ưu đãi mới từ organicfood',
+        'createdAt': p['startDate'],
+        'read': readUpdates.contains(
+          'promotion:${p['id']}:${p['startDate']}:${p['endDate']}',
         ),
-      ]..sort(
-        (a, b) =>
-            '${b['createdAt'] ?? ''}'.compareTo('${a['createdAt'] ?? ''}'),
-      );
+      },
+    ),
+  ]..sort((a, b) => '${b['createdAt'] ?? ''}'.compareTo('${a['createdAt'] ?? ''}'));
   int get unread => !loggedIn
       ? 0
       : _inboxUnread +
@@ -158,8 +190,15 @@ class OrganicStore extends ChangeNotifier {
       }
     });
     await _loadFavorites();
+    try {
+      await cartService.restore();
+      if (!loggedIn && cartService.hasGuestCart) await refreshCart();
+    } catch (_) {
+      // Cart identity remains separate from the customer's saved session.
+    }
     if (loggedIn) {
       unawaited(refreshAccount());
+      unawaited(push.restore());
     }
   }
 
@@ -199,6 +238,7 @@ class OrganicStore extends ChangeNotifier {
   }
 
   void _clearAccount() {
+    push.sessionCleared();
     final draft = pendingReturn;
     if (draft != null) {
       unawaited(
@@ -258,10 +298,27 @@ class OrganicStore extends ChangeNotifier {
     String keyword = '',
     String? categoryId,
     int page = 0,
+    int size = 20,
+    String sortBy = 'createdAt',
+    String direction = 'desc',
+  }) async => (await productPage(
+    keyword: keyword,
+    categoryId: categoryId,
+    page: page,
+    size: size,
+    sortBy: sortBy,
+    direction: direction,
+  )).items;
+
+  Future<ProductPage> productPage({
+    String keyword = '',
+    String? categoryId,
+    int page = 0,
+    int size = 8,
     String sortBy = 'createdAt',
     String direction = 'desc',
   }) async {
-    return pageItems(
+    return ProductPage.fromJson(
       await api.request(
         'GET',
         '/products',
@@ -270,12 +327,12 @@ class OrganicStore extends ChangeNotifier {
           'keyword': keyword,
           'categoryId': categoryId,
           'page': page,
-          'size': 20,
+          'size': size,
           'sortBy': sortBy,
           'direction': direction,
         },
       ),
-    ).map(Product.fromJson).toList();
+    );
   }
 
   Future<void> login(String username, String password) async {
@@ -341,16 +398,22 @@ class OrganicStore extends ChangeNotifier {
         (result['refreshToken'] as String).isEmpty) {
       throw const ApiException('Máy chủ trả về phiên đăng nhập chưa hợp lệ.');
     }
+    final guestPromotion = !loggedIn ? selectedPromotionCode : '';
+    final guestVoucher = !loggedIn ? selectedVoucherCode : '';
     _clearAccount();
+    selectedPromotionCode = guestPromotion;
+    selectedVoucherCode = guestVoucher;
     user = info;
     api.setSession(result['accessToken'], result['refreshToken']);
     await _saveSession();
     await _loadFavorites();
     await refreshAccount();
+    unawaited(push.restore());
     return true;
   }
 
   Future<void> logout() async {
+    await push.disable();
     final revoke = api
         .request('POST', '/auth/logout')
         .then<void>((_) {}, onError: (Object _) {});
@@ -362,6 +425,13 @@ class OrganicStore extends ChangeNotifier {
     } catch (_) {
       /* Clear device session even offline. */
     }
+  }
+
+  /// Password completion already revoked server sessions; do not replay logout.
+  Future<void> clearLocalSession() async {
+    api.setSession(null, null);
+    _clearAccount();
+    await _saveSession();
   }
 
   Future<void> refreshAccount({bool force = false}) async {
@@ -401,7 +471,13 @@ class OrganicStore extends ChangeNotifier {
     try {
       final results = await Future.wait([
         fetch('/customers/me'),
-        fetch('/cart'),
+        (() async {
+          try {
+            return (await cartService.request('GET'), null);
+          } catch (error) {
+            return (null, error);
+          }
+        })(),
         fetch('/customers/me/rewards'),
         fetch('/orders', query: {'size': 20}),
         fetch('/promotions', query: {'size': 100}),
@@ -454,15 +530,22 @@ class OrganicStore extends ChangeNotifier {
   Future<void> add(String variantId, int quantity) async {
     final generation = _generation, revision = ++_cartRevision;
     final result = object(
-      await api.request(
-        'POST',
-        '/cart/items',
-        body: {'variantId': variantId, 'quantity': quantity},
-      ),
+      await cartService.request('POST', '/items', {
+        'variantId': variantId,
+        'quantity': quantity,
+      }),
     );
-    if (generation != _generation || revision != _cartRevision || !loggedIn) {
+    if (generation != _generation || revision != _cartRevision) {
       return;
     }
+    cart = result;
+    notifyListeners();
+  }
+
+  Future<void> refreshCart() async {
+    final generation = _generation, revision = _cartRevision;
+    final result = await cartService.request('GET');
+    if (generation != _generation || revision != _cartRevision) return;
     cart = result;
     notifyListeners();
   }
@@ -499,16 +582,16 @@ class OrganicStore extends ChangeNotifier {
   Future<void> quantity(String id, int value, {int? expectedQuantity}) async {
     final generation = _generation, revision = ++_cartRevision;
     final result = object(
-      await api.request(
+      await cartService.request(
         value <= 0 ? 'DELETE' : 'PATCH',
-        '/cart/items/$id',
-        body: value <= 0 ? null : {'quantity': value},
-        query: expectedQuantity == null
+        '/items/$id',
+        value <= 0 ? null : {'quantity': value},
+        expectedQuantity == null
             ? null
             : {'expectedQuantity': expectedQuantity},
       ),
     );
-    if (generation != _generation || revision != _cartRevision || !loggedIn) {
+    if (generation != _generation || revision != _cartRevision) {
       return;
     }
     cart = result;
@@ -533,9 +616,9 @@ class OrganicStore extends ChangeNotifier {
   Future<void> addBatch(List<Json> items) async {
     final generation = _generation, revision = ++_cartRevision;
     final result = object(
-      await api.request('POST', '/cart/items/batch', body: {'items': items}),
+      await cartService.request('POST', '/items/batch', {'items': items}),
     );
-    if (generation != _generation || revision != _cartRevision || !loggedIn) {
+    if (generation != _generation || revision != _cartRevision) {
       return;
     }
     cart = result;
@@ -787,6 +870,7 @@ class OrganicStore extends ChangeNotifier {
 
   @override
   void dispose() {
+    push.dispose();
     _disposed = true;
     _timer?.cancel();
     api.close();

@@ -12,6 +12,8 @@ import '../../../shared/widgets/account_error.dart';
 import '../../../shared/widgets/panel.dart';
 import '../../feedback/presentation/feedback_detail_screen.dart';
 import '../../returns/presentation/return_detail_screen.dart';
+import '../data/customer_push.dart';
+import 'push_settings.dart';
 
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
@@ -34,7 +36,10 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         open(context, const PromotionsScreen());
       }
       if (update['kind'] == 'inbox') {
-        if (update['returnRequestId'] != null) {
+        final destination = notificationDestination(update);
+        if (destination?.kind == 'don-hang') {
+          open(context, OrderScreen(destination!.id), account: true);
+        } else if (update['returnRequestId'] != null) {
           open(
             context,
             ReturnDetailScreen('${update['returnRequestId']}'),
@@ -78,6 +83,8 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
                 children: [
+                  const PushSettings(),
+                  const SizedBox(height: 16),
                   const Text(
                     'Đơn hàng, thông báo và khuyến mãi được cập nhật khi bạn sử dụng ứng dụng.',
                   ),

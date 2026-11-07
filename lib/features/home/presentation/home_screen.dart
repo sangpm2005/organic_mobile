@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'widgets/home_banners.dart';
+import '../../store_info/presentation/contact_screen.dart';
+
 import '../../store_info/presentation/store_info_screen.dart';
 
-import 'package:organic_mobile/features/promotions/presentation/promotions_screen.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/catalog/presentation/catalog_screen.dart';
 import 'package:organic_mobile/features/catalog/presentation/product_screen.dart';
@@ -34,8 +36,15 @@ class _HomeScreenState extends State<HomeScreen> {
         return true;
       },
       builder: (_) => RefreshIndicator(
-        onRefresh: store.loadHome,
+        onRefresh: () async {
+          try {
+            await store.loadHome();
+          } catch (error) {
+            if (context.mounted) toast(context, error);
+          }
+        },
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
             Container(
               color: ink,
@@ -54,8 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(22, 22, 16, 22),
               child: Row(
                 children: [
-                  const Brand(),
-                  const Spacer(),
+                  const Expanded(child: Brand()),
                   IconButton(
                     tooltip: 'Tìm sản phẩm',
                     onPressed: widget.catalog,
@@ -97,12 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: muted, height: 1.8, fontSize: 12),
                   ),
-                  const SizedBox(height: 22),
-                  FilledButton.icon(
-                    onPressed: widget.catalog,
-                    label: const Text('Khám phá sản phẩm'),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  ),
                   const SizedBox(height: 26),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -143,82 +145,100 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Text('Xem hết →', style: TextStyle(fontSize: 11)),
               ),
             ),
-            SizedBox(
-              height: 96,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                separatorBuilder: (_, i) => const SizedBox(width: 12),
-                itemCount: objects(store.home['categories']).length,
-                itemBuilder: (_, index) {
-                  final c = objects(store.home['categories'])[index];
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () => open(
-                      context,
-                      CatalogScreen(
-                        categoryId: '${c['id']}',
-                        title: '${c['name']}',
-                      ),
-                    ),
-                    child: Container(
-                      width: 125,
-                      padding: const EdgeInsets.all(13),
-                      decoration: BoxDecoration(
-                        color: index.isEven ? sage : const Color(0xFFF4E8DC),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (index, c) in objects(
+                    store.home['categories'],
+                  ).indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            [
-                              Icons.eco_outlined,
-                              Icons.spa_outlined,
-                              Icons.grain,
-                              Icons.local_florist_outlined,
-                            ][index % 4],
-                            color: moss,
-                            size: 24,
+                        onTap: () => open(
+                          context,
+                          CatalogScreen(
+                            categoryId: '${c['id']}',
+                            title: '${c['name']}',
                           ),
-                          const Spacer(),
-                          Text(
-                            '${c['name']}',
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        ),
+                        child: Container(
+                          width: 155,
+                          padding: const EdgeInsets.all(13),
+                          decoration: BoxDecoration(
+                            color: index.isEven
+                                ? sage
+                                : const Color(0xFFF4E8DC),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          Text(
-                            '${c['productCount']} sản phẩm',
-                            style: const TextStyle(fontSize: 9, color: muted),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                [
+                                  Icons.eco_outlined,
+                                  Icons.spa_outlined,
+                                  Icons.grain,
+                                  Icons.local_florist_outlined,
+                                ][index % 4],
+                                color: moss,
+                                size: 24,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${c['name']}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${c['productCount']} sản phẩm',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: muted,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
             const Heading(
               'organicfood chọn cho bạn',
-              eyebrow: 'Sản phẩm nổi bật',
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: OutlinedButton.icon(
-                onPressed: () => open(context, const PromotionsScreen()),
-                icon: const Icon(Icons.local_offer_outlined),
-                label: Text(
-                  'Ưu đãi & combo${store.publicOffers.isEmpty ? '' : ' (${store.publicOffers.length})'}',
-                ),
-              ),
+              eyebrow: 'Gợi ý mỗi ngày',
             ),
             ProductGrid(
               store.featured,
               onTap: (p) => open(context, ProductScreen(p.id)),
             ),
+            if (store.discounted.isNotEmpty) ...[
+              const Heading(
+                'Chọn điều lành, thêm tiết kiệm',
+                eyebrow: 'Sản phẩm đang giảm giá',
+              ),
+              ProductGrid(
+                store.discounted,
+                onTap: (p) => open(context, ProductScreen(p.id)),
+              ),
+            ],
+            if (objects(object(store.home['content'])['banners']).isNotEmpty ||
+                store.publicOffers.isNotEmpty) ...[
+              const Heading(
+                'Ưu đãi đang diễn ra',
+                eyebrow: 'Chương trình từ cửa hàng',
+              ),
+              HomeBanners(
+                banners: objects(object(store.home['content'])['banners']),
+                offers: store.publicOffers,
+              ),
+            ],
             Padding(
               padding: const EdgeInsets.all(22),
               child: Panel(
@@ -255,7 +275,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             TextButton(
               onPressed: () => open(context, const StoreInfoScreen()),
-              child: const Text('Thông tin & liên hệ organicfood'),
+              child: const Text('Về cửa hàng organicfood'),
+            ),
+            TextButton.icon(
+              onPressed: () => open(context, const ContactScreen()),
+              icon: const Icon(Icons.support_agent_outlined),
+              label: const Text('Thông tin liên hệ'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 12, 22, 28),
+              child: FilledButton.icon(
+                key: const ValueKey('home.explore'),
+                onPressed: widget.catalog,
+                label: const Text(
+                  'Ghé xem tất cả sản phẩm',
+                  textAlign: TextAlign.center,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              ),
             ),
           ],
         ),

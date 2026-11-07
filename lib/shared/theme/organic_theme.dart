@@ -31,7 +31,12 @@ ThemeData organicTheme() => ThemeData(
       height: 1.35,
       color: ink,
     ),
-    titleLarge: TextStyle(fontFamily: 'Lora', fontSize: 22, color: ink),
+    titleLarge: TextStyle(
+      fontFamily: 'Lora',
+      fontSize: 22,
+      height: 1.4,
+      color: ink,
+    ),
     bodyMedium: TextStyle(fontSize: 13, height: 1.55, color: ink),
     bodySmall: TextStyle(fontSize: 11, height: 1.5, color: muted),
   ),
@@ -42,6 +47,7 @@ ThemeData organicTheme() => ThemeData(
     centerTitle: false,
   ),
   inputDecorationTheme: InputDecorationTheme(
+    floatingLabelBehavior: FloatingLabelBehavior.always,
     filled: true,
     fillColor: surface,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),

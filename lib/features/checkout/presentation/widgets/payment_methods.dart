@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'payment_brand.dart';
+
 class PaymentMethods extends StatelessWidget {
   final Map<String, dynamic> available;
   final String value;
@@ -28,30 +30,13 @@ class PaymentMethods extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         for (final entry in const {
-          'cod': (
-            'Thanh toán khi nhận hàng (COD)',
-            'Trả tiền khi nhận hàng.',
-            Icons.payments_outlined,
-          ),
-          'payos': (
-            'VietQR',
-            'Chuyển khoản ngân hàng qua mã QR của payOS.',
-            Icons.qr_code_2,
-          ),
-          'paypal': (
-            'PayPal',
-            'Đăng nhập và xác nhận riêng trên PayPal.',
-            Icons.account_balance_wallet_outlined,
-          ),
-          'vnpay': (
-            'VNPay',
-            'Thanh toán qua ngân hàng hoặc ví VNPay.',
-            Icons.account_balance_outlined,
-          ),
+          'cod': ('Thanh toán khi nhận hàng (COD)', 'Trả tiền khi nhận hàng.'),
+          'payos': ('VietQR', 'Chuyển khoản ngân hàng qua mã QR của payOS.'),
+          'paypal': ('PayPal', 'Đăng nhập và xác nhận riêng trên PayPal.'),
+          'vnpay': ('VNPay', 'Thanh toán qua ngân hàng hoặc ví VNPay.'),
           'stripe': (
             'Thẻ quốc tế (Stripe)',
             'Thanh toán bằng thẻ trên Stripe.',
-            Icons.credit_card_outlined,
           ),
         }.entries)
           if (available[entry.key] == true || entry.key == value)
@@ -70,7 +55,7 @@ class PaymentMethods extends StatelessWidget {
                   key: ValueKey('checkout.payment.${entry.key}'),
                   value: entry.key,
                   enabled: enabled && available[entry.key] == true,
-                  secondary: Icon(entry.value.$3),
+                  secondary: PaymentBrand(entry.key),
                   title: Text(entry.value.$1),
                   subtitle: Text(
                     available[entry.key] == true

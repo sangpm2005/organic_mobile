@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:organic_mobile/app/state/organic_store.dart';
 import 'package:organic_mobile/core/network/organic_api.dart';
+import 'package:organic_mobile/core/network/api_exception.dart';
 import 'package:organic_mobile/features/auth/presentation/login_screen.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 
@@ -80,11 +81,45 @@ void main() {
       expect(nativeCalls, 1);
       expect(loginPosts, 0);
       expect(
+        find.textContaining('Đăng nhập Google chưa hoàn tất.'),
+        findsOneWidget,
+      );
+      expect(
         tester
             .widget<OutlinedButton>(find.byKey(const ValueKey('auth.google')))
             .onPressed,
         isNotNull,
       );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      store.dispose();
+    },
+  );
+
+  testWidgets(
+    'a Google provider failure is visible without requiring the password form',
+    (tester) async {
+      final store = OrganicStore(
+        api: OrganicApi(
+          client: MockClient(
+            (request) async => challenge(cookie: challengeCookie),
+          ),
+        ),
+        googleIdentity: FakeGoogleIdentity((_, _) async {
+          throw const ApiException(
+            'Đăng nhập Google chưa được cấu hình cho bản ứng dụng này.',
+          );
+        }),
+      );
+      await openLogin(tester, store);
+      await tester.tap(find.byKey(const ValueKey('auth.google')));
+      await tester.pumpAndSettle();
+      expect(store.loggedIn, false);
+      expect(
+        find.textContaining('Đăng nhập Google chưa được cấu hình'),
+        findsOneWidget,
+      );
+      expect(find.text('Nhập mật khẩu.'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       store.dispose();

@@ -31,8 +31,6 @@ class RemoteAttachments extends StatelessWidget {
               : const Icon(Icons.play_circle_outline),
           title: Text(
             '${file['originalFilename'] ?? (file['mediaType'] == 'image' ? 'Ảnh đính kèm' : 'Video đính kèm')}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
           onTap: () async {
             final uri = Uri.tryParse('${file['mediaUrl']}');

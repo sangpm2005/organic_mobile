@@ -5,6 +5,8 @@ Ba repo đang nằm cạnh nhau: `organic_mobile`, `organic_backend`, `organic_f
 | Luồng mobile | API dưới `/api/v1` | Tương ứng website |
 | --- | --- | --- |
 | Phiên, đăng ký OTP | `/auth/*` | AuthContext, trang đăng nhập/đăng ký |
+| Quên/đổi mật khẩu | `/auth/password/{forgot,change}/{request,verify,complete}` | OTP email, đặt mật khẩu và đăng nhập lại |
+| Thiết bị thông báo khách hàng | `PUT/DELETE /notifications/devices` | Bật/tắt push của tài khoản đăng nhập |
 | Trang chủ, danh mục, sản phẩm | `/home`, `/categories`, `/products`, `/products/{id}`, `/products/{id}/availability`, `/products/{id}/reviews` | catalogService, HomePage |
 | Hồ sơ, địa chỉ | `/customers/me`, `/customers/me/addresses` | customerService |
 | Giỏ | `/cart`, `/cart/items`, `/cart/items/batch` | cartService, ShopContext |
@@ -30,14 +32,14 @@ Ba repo đang nằm cạnh nhau: `organic_mobile`, `organic_backend`, `organic_f
 - Điểm trực tiếp tuân thủ số dư khả dụng, `redeemLimit` và giới hạn 50 trong DTO backend. Giá và quyền sử dụng được backend kiểm tra lại.
 - Sau đặt hàng, chỉ xóa dòng giỏ nếu quantity hiện tại bằng quantity đã mua. Redis so sánh/xóa nguyên tử; lệch số lượng trả 409, giữ dòng và tải lại giỏ. DELETE thường không có tham số vẫn xóa như trước.
 - Thêm combo dùng `/cart/items/batch`; backend kiểm tra toàn bộ trước khi cập nhật. Mã khuyến mãi chỉ được chọn sau khi thêm thành công.
-- Thanh toán dùng đúng gateway backend bật. Chỉ mở HTTPS trên danh sách host chính thức giống website, không có userInfo trong URL. Link mở thành công không có nghĩa đã trả tiền. Trạng thái trả tiền lấy từ backend; PayPal chỉ capture sau xác nhận người dùng.
+- Thanh toán dùng đúng gateway backend bật. Chỉ mở HTTPS trên danh sách host chính thức giống website, không có userInfo trong URL. Link mở thành công không có nghĩa đã trả tiền. Chi tiết đơn tự sync giao dịch đang chờ; PayPal capture qua backend và vẫn cần khách chấp thuận trên cổng PayPal, không cần thêm xác nhận thủ công trong app.
 - Có kiểm tra phiên để phản hồi muộn không đưa dữ liệu tài khoản trước vào tài khoản sau. Dừng polling khi app không hoạt động; tải lại khi quay về.
 
 ## Thông báo và giới hạn phạm vi
 
 Inbox có phân trang và endpoint đánh dấu đọc phía backend. Cập nhật đơn/ưu đãi được tổng hợp từ dữ liệu khách hàng, lưu key đọc trong secure storage của phiên. Màn hình chỉ mở các route mobile biết trước; không điều hướng URL tùy ý do nội dung inbox gửi về.
 
-`/notifications` và đăng ký thiết bị FCM hiện phục vụ ADMIN/WAREHOUSE_STAFF. Không sử dụng các endpoint này cho khách hàng hoặc nhúng thông tin xác thực nhân viên. Để có push nền khách hàng cần bổ sung luồng đăng ký thiết bị, phát sự kiện đơn/khuyến mãi và cấu hình Firebase của ứng dụng.
+`/notifications` vẫn là danh sách cảnh báo nhân viên. Riêng `PUT/DELETE /notifications/devices` ở backend mới cho phép CUSTOMER đăng ký/gỡ thiết bị của mình; mobile không cần quyền nhân viên. Inbox và job FCM khách hàng đã có. Push thật cần Firebase Android/iOS và Firebase Admin; xem `mobile-push-setup.md`. Chưa có chiến dịch push khuyến mãi hàng loạt.
 
 Đã triển khai màn hình khách hàng cho phản hồi, đổi trả và đánh giá. Inbox mở chi tiết theo `feedbackId`/`returnRequestId`, không dùng URL quản trị do dữ liệu gửi kèm. Khách hàng chỉ xem tiến độ hoàn tiền, thu hồi và đơn đổi; thao tác duyệt, nhập kho, xác nhận chuyển tiền và giao hàng vẫn thuộc nhân viên trên backend/website.
 

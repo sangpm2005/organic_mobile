@@ -4,11 +4,12 @@ import 'package:organic_mobile/core/network/api_exception.dart';
 import 'package:organic_mobile/core/utils/formatters.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/orders/presentation/order_screen.dart';
+import 'package:organic_mobile/features/address/domain/vietnam_address.dart';
+import 'package:organic_mobile/features/address/presentation/address_picker_screen.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/theme/organic_theme.dart';
-import 'package:organic_mobile/shared/widgets/paged_records.dart';
-import 'package:organic_mobile/features/rewards/presentation/widgets/voucher_card.dart';
+import 'package:organic_mobile/features/rewards/presentation/voucher_picker_screen.dart';
 
 import 'widgets/delivery_location_picker.dart';
 import 'widgets/price_summary.dart';
@@ -76,12 +77,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           '${address['receiverName'] ?? fields['receiverName']!.text}';
       fields['receiverPhone']!.text =
           '${address['receiverPhone'] ?? fields['receiverPhone']!.text}';
-      fields['shippingAddress']!.text = [
-        address['streetAddress'],
-        address['ward'],
-        address['district'],
-        address['province'],
-      ].where((e) => e != null && '$e'.isNotEmpty).join(', ');
+      fields['shippingAddress']!.text = savedAddressText(address);
     }
     final pending = store!.pendingCheckout;
     if (pending != null) {
@@ -136,46 +132,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'deliveryLongitude': location?['longitude'],
       };
   Future<void> chooseLocation() async {
+    final address = fields['shippingAddress']!.text;
     final result = await Navigator.of(context).push<Json>(
       MaterialPageRoute(
-        builder: (_) => SessionBoundary(
-          child: DeliveryLocationPicker(
-            address: fields['shippingAddress']!.text,
-          ),
-        ),
+        builder: (_) =>
+            SessionBoundary(child: DeliveryLocationPicker(address: address)),
       ),
     );
-    if (result == null || !mounted) return;
-    fields['shippingAddress']!.text = '${result['label']}';
+    if (result == null ||
+        !mounted ||
+        !sameSession ||
+        submitted ||
+        fields['shippingAddress']!.text != address) {
+      return;
+    }
     location = result;
     invalidate();
   }
 
+  Future<void> chooseAddress() async {
+    if (busy || submitted || !sameSession) return;
+    final result = await open<String>(
+      context,
+      AddressPickerScreen(initialAddress: fields['shippingAddress']!.text),
+      account: true,
+    );
+    if (result == null || !mounted || !sameSession || submitted || busy) return;
+    fields['shippingAddress']!.text = result;
+    location = null;
+    invalidate();
+  }
+
   Future<void> chooseVoucher() async {
-    final voucher = await Navigator.of(context).push<Json>(
-      MaterialPageRoute(
-        builder: (ctx) => SessionBoundary(
-          child: Scaffold(
-            appBar: AppBar(title: const Text('Chọn voucher')),
-            body: PagedRecords(
-              load: store!.rewardService.wallet,
-              empty: 'Chưa có voucher trong ví.',
-              itemBuilder: (p) => VoucherCard(
-                p,
-                action: p['usable'] != true
-                    ? null
-                    : TextButton(
-                        onPressed: () => Navigator.pop(ctx, p),
-                        child: const Text('Sử dụng'),
-                      ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    final voucher = await open<Json>(
+      context,
+      VoucherPickerScreen(checkoutPayload: payload()),
+      account: true,
     );
     if (voucher == null || !mounted) return;
     fields['voucherCode']!.text = '${voucher['voucherCode']}';
+    store!.selectVoucher('${voucher['voucherCode']}');
     fields['points']!.text = '0';
     invalidate();
   }
@@ -342,15 +338,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: TextFormField(
                       key: ValueKey('checkout.${entry.key}'),
                       controller: fields[entry.key],
+                      readOnly: entry.key == 'shippingAddress',
+                      onTap: entry.key == 'shippingAddress'
+                          ? chooseAddress
+                          : null,
                       onChanged: (value) {
                         if (entry.key == 'shippingAddress') location = null;
                         if (entry.key == 'voucherCode' &&
                             value.trim().isNotEmpty) {
                           fields['points']!.text = '0';
                         }
+                        if (entry.key == 'voucherCode') {
+                          store!.selectVoucher(value);
+                        }
                         if (entry.key == 'points' &&
                             (int.tryParse(value) ?? 0) > 0) {
                           fields['voucherCode']!.clear();
+                          store!.selectVoucher('');
                         }
                         invalidate();
                       },
@@ -359,8 +363,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ['points', 'receiverPhone'].contains(entry.key)
                           ? TextInputType.phone
                           : TextInputType.text,
-                      maxLines: entry.key == 'shippingAddress' ? 2 : 1,
-                      decoration: InputDecoration(labelText: entry.value),
+                      maxLines: entry.key == 'shippingAddress' ? null : 1,
+                      decoration: InputDecoration(
+                        labelText: entry.value,
+                        hintText: entry.key == 'shippingAddress'
+                            ? 'Chọn tỉnh/thành phố, phường/xã và số nhà'
+                            : null,
+                        suffixIcon: entry.key == 'shippingAddress'
+                            ? const Icon(Icons.expand_more)
+                            : null,
+                      ),
                       validator: (value) {
                         final v = value?.trim() ?? '';
                         if ([

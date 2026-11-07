@@ -1,5 +1,14 @@
 import '../../../core/utils/json.dart';
 
+class ProductPage {
+  final List<Product> items;
+  final int total, pages;
+  ProductPage.fromJson(dynamic data)
+    : items = pageItems(data).map(Product.fromJson).toList(),
+      total = number(object(data)['totalElements']).toInt(),
+      pages = number(object(data)['totalPages']).toInt();
+}
+
 class Product {
   final String id, name, category, image, slug;
   final String? variantId, variantName;

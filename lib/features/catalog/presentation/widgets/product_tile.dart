@@ -24,7 +24,8 @@ class ProductTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 1.1,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -58,8 +59,6 @@ class ProductTile extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(5, 12, 5, 0),
               child: Text(
                 product.category.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 8,
                   letterSpacing: 1,
@@ -71,8 +70,6 @@ class ProductTile extends StatelessWidget {
               padding: const EdgeInsets.all(5),
               child: Text(
                 product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 12,
                   height: 1.5,
@@ -84,38 +81,39 @@ class ProductTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 5),
               child: Text(
                 product.variantName ?? 'Xem quy cách',
-                maxLines: 1,
                 style: const TextStyle(fontSize: 10, color: muted),
               ),
             ),
             const SizedBox(height: 8),
             const Divider(height: 1),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (product.comparePrice > product.price)
-                        Text(
-                          money(product.comparePrice),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: muted,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (product.comparePrice > product.price)
                       Text(
-                        money(product.price),
+                        money(product.comparePrice),
                         style: const TextStyle(
-                          fontSize: 15,
-                          color: moss,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 9,
+                          color: muted,
+                          decoration: TextDecoration.lineThrough,
                         ),
                       ),
-                    ],
-                  ),
+                    Text(
+                      money(product.price),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: moss,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
                 const CircleAvatar(
                   radius: 15,

@@ -28,11 +28,12 @@ class CatalogScreen extends StatefulWidget {
 
 class _CatalogScreenState extends State<CatalogScreen> {
   final search = TextEditingController();
+  final scroll = ScrollController();
   Timer? debounce;
   List<Product> products = [];
   String? category, error;
-  int page = 0, requestVersion = 0;
-  bool busy = true, hasMore = false;
+  int page = 0, requestVersion = 0, total = 0, pages = 0;
+  bool busy = true;
   String sort = 'newest';
   OrganicStore? store;
   @override
@@ -46,21 +47,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  Future<void> load({bool more = false}) async {
+  Future<void> load({int targetPage = 0}) async {
     final version = ++requestVersion;
-    final requestedPage = more ? page + 1 : 0;
+    final requestedPage = targetPage;
     setState(() {
       busy = true;
       error = null;
-      if (!more) {
-        page = 0;
-      }
     });
     try {
-      final result = await store!.products(
+      final result = await store!.productPage(
         keyword: search.text.trim(),
         categoryId: category,
         page: requestedPage,
+        size: 8,
         sortBy: sort == 'newest' ? 'createdAt' : 'productName',
         direction: sort == 'low' ? 'asc' : 'desc',
       );
@@ -68,10 +67,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
         return;
       }
       setState(() {
-        products = more ? [...products, ...result] : result;
+        products = result.items.take(8).toList();
         page = requestedPage;
-        hasMore = result.length == 20;
+        total = result.total;
+        pages = result.pages;
       });
+      if (scroll.hasClients) scroll.jumpTo(0);
     } catch (e) {
       if (mounted && version == requestVersion) {
         setState(() => error = '$e');
@@ -86,6 +87,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void dispose() {
     search.dispose();
+    scroll.dispose();
     debounce?.cancel();
     super.dispose();
   }
@@ -95,6 +97,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final content = RefreshIndicator(
       onRefresh: load,
       child: ListView(
+        controller: scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           Heading(
             widget.title ?? 'Ghé vườn nhà organicfood',
@@ -154,7 +158,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    '${products.length} sản phẩm đã tải',
+                    '$total sản phẩm · Tối đa 8 sản phẩm / trang',
                     style: const TextStyle(fontSize: 11, color: muted),
                   ),
                 ),
@@ -193,7 +197,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               'Chưa tìm thấy sản phẩm',
               'Thử một từ khóa hoặc danh mục khác.',
             )
-          else
+          else if (!busy)
             ProductGrid(
               products,
               onTap: (p) => open(context, ProductScreen(p.id)),
@@ -203,12 +207,31 @@ class _CatalogScreenState extends State<CatalogScreen> {
               padding: EdgeInsets.all(32),
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
-          if (!busy && hasMore)
+          if (pages > 1)
             Padding(
               padding: const EdgeInsets.all(22),
-              child: OutlinedButton(
-                onPressed: () => load(more: true),
-                child: const Text('Xem thêm sản phẩm'),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    key: const ValueKey('catalog.previous'),
+                    onPressed: busy || page == 0
+                        ? null
+                        : () => load(targetPage: page - 1),
+                    child: const Text('Trang trước'),
+                  ),
+                  Text('Trang ${page + 1} / $pages'),
+                  OutlinedButton(
+                    key: const ValueKey('catalog.next'),
+                    onPressed: busy || page + 1 >= pages
+                        ? null
+                        : () => load(targetPage: page + 1),
+                    child: const Text('Trang sau'),
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 24),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/account/presentation/address_form.dart';
+import 'package:organic_mobile/features/address/domain/vietnam_address.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/theme/organic_theme.dart';
@@ -36,12 +37,7 @@ class AddressesScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text('${a['receiverName']} · ${a['receiverPhone']}'),
                     Text(
-                      [
-                        a['streetAddress'],
-                        a['ward'],
-                        a['district'],
-                        a['province'],
-                      ].where((e) => e != null && '$e'.isNotEmpty).join(', '),
+                      savedAddressText(a),
                       style: const TextStyle(color: muted),
                     ),
                     TextButton(
