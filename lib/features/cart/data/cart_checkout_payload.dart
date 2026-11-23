@@ -1,6 +1,7 @@
 import '../../../app/state/organic_store.dart';
 import '../../../core/utils/json.dart';
 import '../../address/domain/vietnam_address.dart';
+import '../../catalog/domain/sale_selection.dart';
 
 Json? cartCheckoutPayload(OrganicStore store, {String voucher = ''}) {
   final profile = store.profile;
@@ -15,9 +16,7 @@ Json? cartCheckoutPayload(OrganicStore store, {String voucher = ''}) {
       .trim();
   final street = savedAddressText(address);
   return validVoucherRecipient({
-    'items': store.cartItems
-        .map((i) => {'variantId': i['variantId'], 'quantity': i['quantity']})
-        .toList(),
+    'items': store.cartItems.map(saleItem).toList(),
     'receiverName': name,
     'receiverPhone': phone,
     'shippingAddress': street,

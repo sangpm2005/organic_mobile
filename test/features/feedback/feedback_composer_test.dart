@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,11 +8,160 @@ import 'package:http/testing.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/widgets/attachment_picker.dart';
 import 'package:organic_mobile/features/feedback/presentation/widgets/feedback_composer.dart';
+import 'package:organic_mobile/shared/theme/organic_theme.dart';
 
 import '../../helpers/customer_fixtures.dart';
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  testWidgets(
+    'subject suggestions follow the support type without overwriting custom text',
+    (tester) async {
+      final completed = Completer<void>();
+      Map<String, dynamic>? submitted;
+      var created = 0;
+      final store = customer(
+        MockClient((request) async {
+          submitted = jsonDecode(request.body) as Map<String, dynamic>;
+          await completed.future;
+          return response({
+            'feedback': {'id': 'feedback'},
+          });
+        }),
+      );
+      await tester.pumpWidget(
+        StoreScope(
+          store: store,
+          child: MaterialApp(
+            theme: organicTheme(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: FeedbackComposer(
+                  canUpload: false,
+                  onSaved: () {},
+                  onUncertain: () {},
+                  onCreated: (_) => created++,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final subjectField = find.byKey(const ValueKey('feedback.subject'));
+      final typeField = find.byKey(const ValueKey('feedback.type'));
+      String subjectText() =>
+          tester.widget<TextFormField>(subjectField).controller!.text;
+      Future<void> chooseType(String label) async {
+        await tester.ensureVisible(typeField);
+        await tester.tap(typeField);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(
+        find.widgetWithText(ActionChip, 'Cách bảo quản sản phẩm'),
+      );
+      await tester.pump();
+      expect(subjectText(), 'Cách bảo quản sản phẩm');
+      await tester.enterText(subjectField, 'Hỏi về sản phẩm trong đơn của tôi');
+      tester.testTextInput.hide();
+      await chooseType('Giao hàng');
+      expect(subjectText(), 'Hỏi về sản phẩm trong đơn của tôi');
+      expect(find.widgetWithText(ActionChip, 'Giao hàng chậm'), findsOneWidget);
+      await chooseType('Dịch vụ');
+      expect(
+        find.widgetWithText(ActionChip, 'Cần nhân viên tư vấn'),
+        findsOneWidget,
+      );
+      await chooseType('Góp ý khác');
+      expect(
+        find.widgetWithText(ActionChip, 'Đề xuất sản phẩm mới'),
+        findsOneWidget,
+      );
+      await chooseType('Thanh toán');
+      expect(subjectText(), 'Hỏi về sản phẩm trong đơn của tôi');
+      expect(find.widgetWithText(ActionChip, 'Giao hàng chậm'), findsNothing);
+      await tester.tap(
+        find.widgetWithText(ActionChip, 'Thanh toán chưa cập nhật'),
+      );
+      await tester.pump();
+      expect(subjectText(), 'Thanh toán chưa cập nhật');
+      await tester.enterText(subjectField, 'Thanh toán đơn hàng chưa cập nhật');
+      await tester.enterText(
+        find.byKey(const ValueKey('feedback.content')),
+        'Tôi đã thanh toán, nhờ cửa hàng kiểm tra giúp.',
+      );
+      tester.testTextInput.hide();
+      await tester.ensureVisible(find.text('Gửi phản hồi'));
+      await tester.tap(find.text('Gửi phản hồi'));
+      await tester.pump();
+      expect(submitted?['feedbackType'], 'payment');
+      expect(submitted?['subject'], 'Thanh toán đơn hàng chưa cập nhật');
+      expect(
+        submitted?['content'],
+        'Tôi đã thanh toán, nhờ cửa hàng kiểm tra giúp.',
+      );
+      expect(tester.widget<TextFormField>(subjectField).enabled, isFalse);
+      for (final chip in tester.widgetList<ActionChip>(
+        find.byType(ActionChip),
+      )) {
+        expect(chip.onPressed, isNull);
+      }
+      completed.complete();
+      await tester.pumpAndSettle();
+      expect(created, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      store.dispose();
+    },
+  );
+  for (final width in [320.0, 390.0]) {
+    testWidgets('subject suggestions fit ${width}px with large text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = customer(MockClient((_) async => response({})));
+      await tester.pumpWidget(
+        StoreScope(
+          store: store,
+          child: MaterialApp(
+            theme: organicTheme(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: FeedbackComposer(
+                  canUpload: false,
+                  onSaved: () {},
+                  onUncertain: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('feedback.type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Thanh toán').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.widgetWithText(ActionChip, 'Thanh toán không thành công'),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      store.dispose();
+    });
+  }
   testWidgets(
     'retry of known failed attachment never resends text or a confirmed image',
     (tester) async {
@@ -113,6 +263,7 @@ void main() {
         find.byType(TextFormField),
         'Xin hỗ trợ đơn hàng.',
       );
+      expect(find.byType(ActionChip), findsNothing);
       tester.testTextInput.hide();
       await tester.tap(find.text('Gửi tin nhắn'));
       await tester.pumpAndSettle();

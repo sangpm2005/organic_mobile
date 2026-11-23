@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../shared/widgets/certificate_preview.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/utils/json.dart';
@@ -43,24 +46,29 @@ class StoreRecordsScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Card(
-                child: ListTile(
-                  leading: Icon(
-                    certificates ? Icons.verified_outlined : Icons.grass,
-                  ),
-                  title: Text('${row['name'] ?? ''}'),
-                  subtitle: Text(
-                    certificates
-                        ? '${row['issuingOrganization'] ?? ''}'
-                        : [
-                            row['region'],
-                            row['country'],
-                          ].where((v) => v != null).join(', '),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => open(
-                    context,
-                    _RecordDetail(row, certificates: certificates),
-                  ),
+                child: Column(
+                  children: [
+                    if (certificates) CertificatePreview(row),
+                    ListTile(
+                      leading: Icon(
+                        certificates ? Icons.verified_outlined : Icons.grass,
+                      ),
+                      title: Text('${row['name'] ?? ''}'),
+                      subtitle: Text(
+                        certificates
+                            ? '${row['issuingOrganization'] ?? ''}'
+                            : [
+                                row['region'],
+                                row['country'],
+                              ].where((v) => v != null).join(', '),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => open(
+                        context,
+                        _RecordDetail(row, certificates: certificates),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -88,6 +96,7 @@ class _RecordDetail extends StatelessWidget {
           '${row['name'] ?? ''}',
           style: Theme.of(context).textTheme.headlineMedium,
         ),
+        if (certificates) CertificatePreview(row, height: 300),
         const SizedBox(height: 20),
         Panel(
           child: Column(

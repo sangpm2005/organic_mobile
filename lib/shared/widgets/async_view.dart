@@ -6,10 +6,24 @@ class AsyncView<T> extends StatefulWidget {
   final Widget Function(T) builder;
   const AsyncView({super.key, required this.load, required this.builder});
   @override
-  State<AsyncView<T>> createState() => _AsyncViewState<T>();
+  State<AsyncView<T>> createState() => AsyncViewState<T>();
 }
 
-class _AsyncViewState<T> extends State<AsyncView<T>> {
+class AsyncViewState<T> extends State<AsyncView<T>> {
+  bool refreshing = false;
+  Future<void> refresh() async {
+    if (refreshing || !mounted) return;
+    refreshing = true;
+    try {
+      final data = await widget.load();
+      if (mounted) setState(() => future = Future.value(data));
+    } catch (_) {
+      /* Preserve visible content on a background failure. */
+    } finally {
+      refreshing = false;
+    }
+  }
+
   late Future<T> future;
   @override
   void initState() {
@@ -21,7 +35,8 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
   Widget build(BuildContext context) => FutureBuilder<T>(
     future: future,
     builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) {
+      if (snapshot.connectionState != ConnectionState.done &&
+          !snapshot.hasData) {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(60),

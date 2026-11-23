@@ -12,6 +12,9 @@ import 'package:organic_mobile/shared/theme/organic_theme.dart';
 import 'package:organic_mobile/features/rewards/presentation/voucher_picker_screen.dart';
 
 import 'widgets/delivery_location_picker.dart';
+import '../../store_info/domain/store_contact.dart';
+import '../../catalog/domain/sale_selection.dart';
+import '../../catalog/presentation/widgets/sale_option_picker.dart';
 import 'widgets/price_summary.dart';
 
 import 'package:organic_mobile/shared/widgets/panel.dart';
@@ -34,6 +37,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'receiverPhone',
       'shippingAddress',
       'note',
+      'invoiceEmail',
       'promotionCode',
       'voucherCode',
       'points',
@@ -51,7 +55,74 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Json methods = {'cod': true};
   String method = 'cod', key = OrganicStore.newIdempotencyKey();
   String? error;
-  bool busy = false, submitted = false;
+  bool busy = false, submitted = false, locating = false, pickup = false;
+  int locationRequest = 0;
+  String? locationMessage;
+  String deliveryAddress = '';
+  static const pickupPrefix =
+      '[Yêu cầu nhận tại cửa hàng] Cần cửa hàng xác nhận lịch nhận.';
+  String orderNote() => [
+    if (pickup) pickupPrefix,
+    if (fields['invoiceEmail']!.text.trim().isNotEmpty)
+      'Email nhận hóa đơn (yêu cầu): ${fields['invoiceEmail']!.text.trim()}',
+    fields['note']!.text.trim(),
+  ].where((v) => v.isNotEmpty).join('\n');
+
+  Future<void> resolveAddress() async {
+    if (!sameSession || submitted || busy) return;
+    final address = fields['shippingAddress']!.text.trim();
+    final request = ++locationRequest;
+    if (address.isEmpty) return;
+    setState(() {
+      locating = true;
+      location = null;
+      locationMessage = 'Đang xác định vị trí nhận hàng…';
+    });
+    try {
+      final found = await store!.checkout.locations(address);
+      if (!mounted ||
+          !sameSession ||
+          request != locationRequest ||
+          submitted ||
+          busy ||
+          fields['shippingAddress']!.text.trim() != address) {
+        return;
+      }
+      final precise = found.where((p) => p['precise'] == true).toList();
+      setState(() {
+        if (found.length == 1 && precise.length == 1) {
+          location = precise.single;
+          locationMessage = 'Đã xác định vị trí nhận hàng. Bạn có thể kiểm tra hoặc chọn lại.';
+        } else {
+          locationMessage = 'Có nhiều vị trí hoặc địa chỉ chưa rõ. Hãy xác nhận điểm nhận hàng.';
+        }
+      });
+      invalidate();
+    } catch (_) {
+      if (mounted && request == locationRequest) {
+        setState(
+          () => locationMessage = 'Chưa xác định được vị trí. Bạn có thể dùng liên kết bản đồ hoặc tọa độ.',
+        );
+      }
+    } finally {
+      if (mounted && request == locationRequest) {
+        setState(() => locating = false);
+      }
+    }
+  }
+
+  void changeFulfillment(bool value) {
+    if (busy || submitted) return;
+    if (value) deliveryAddress = fields['shippingAddress']!.text;
+    pickup = value;
+    fields['shippingAddress']!.text = value
+        ? StoreContact.defaults['contactAddress']!
+        : deliveryAddress;
+    location = null;
+    invalidate();
+    resolveAddress();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -60,9 +131,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     store = StoreScope.of(context);
     sessionVersion = store!.api.sessionVersion;
-    items = store!.cartItems
-        .map((e) => {'variantId': e['variantId'], 'quantity': e['quantity']})
-        .toList();
+    items = store!.cartItems.map(saleItem).toList();
     fields['receiverName']!.text = '${store!.profile?['fullName'] ?? ''}';
     fields['receiverPhone']!.text = '${store!.profile?['phoneNumber'] ?? ''}';
     fields['points']!.text = '0';
@@ -83,9 +152,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (pending != null) {
       final saved = object(pending['payload']);
       frozenPayload = saved;
+      pickup = '${saved['note'] ?? ''}'.startsWith(pickupPrefix);
       for (final entry in fields.entries) {
         entry.value.text = '${saved[entry.key] ?? ''}';
       }
+      final savedNote = '${saved['note'] ?? ''}';
+      final emailLine = RegExp(
+        r'^Email nhận hóa đơn \(yêu cầu\): (.+)$',
+        multiLine: true,
+      ).firstMatch(savedNote);
+      if (emailLine != null) fields['invoiceEmail']!.text = emailLine[1]!;
+      fields['note']!.text = savedNote
+          .split('\n')
+          .where(
+            (line) =>
+                line != pickupPrefix &&
+                !line.startsWith('Email nhận hóa đơn (yêu cầu): '),
+          )
+          .join('\n');
       items = objects(saved['items']);
       method = '${saved['paymentMethod']}';
       key = '${pending['key']}';
@@ -100,6 +184,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       submitted = true;
     }
     loadMethods();
+    if (!submitted && fields['shippingAddress']!.text.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) resolveAddress();
+      });
+    }
   }
 
   Future<void> loadMethods() async {
@@ -118,7 +207,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       {
         'items': items,
         for (final entry in fields.entries)
-          if (entry.key != 'points')
+          if (!['points', 'invoiceEmail'].contains(entry.key))
             entry.key:
                 ['promotionCode', 'voucherCode'].contains(entry.key) &&
                     entry.value.text.trim().isEmpty
@@ -126,6 +215,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : ['promotionCode', 'voucherCode'].contains(entry.key)
                 ? entry.value.text.trim().toUpperCase()
                 : entry.value.text.trim(),
+        'note': orderNote(),
         'paymentMethod': method,
         'points': int.tryParse(fields['points']!.text) ?? 0,
         'deliveryLatitude': location?['latitude'],
@@ -146,12 +236,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         fields['shippingAddress']!.text != address) {
       return;
     }
+    locationRequest++;
+    locating = false;
     location = result;
+    locationMessage = 'Đã chọn vị trí nhận hàng.';
     invalidate();
   }
 
   Future<void> chooseAddress() async {
-    if (busy || submitted || !sameSession) return;
+    if (busy || submitted || !sameSession || pickup) return;
     final result = await open<String>(
       context,
       AddressPickerScreen(initialAddress: fields['shippingAddress']!.text),
@@ -161,6 +254,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     fields['shippingAddress']!.text = result;
     location = null;
     invalidate();
+    await resolveAddress();
   }
 
   Future<void> chooseVoucher() async {
@@ -187,7 +281,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> preview() async {
-    if (!form.currentState!.validate() || items.isEmpty) {
+    if (locating || !form.currentState!.validate() || items.isEmpty) {
       return;
     }
     setState(() {
@@ -211,7 +305,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> create() async {
-    if (quote == null || busy || !sameSession) {
+    if (quote == null || busy || locating || !sameSession) {
       return;
     }
     setState(() {
@@ -263,6 +357,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           method,
         );
         if (!sameSession) return;
+        if (mounted) {
+          toast(
+            context,
+            'Sau khi thanh toán, quay lại ứng dụng để xem kết quả đã được xác nhận.',
+          );
+        }
         await openPaymentPortal(payment);
       } catch (e) {
         paymentWarning =
@@ -273,11 +373,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!sameSession) return;
       try {
         await store!.quantity(
-          '${item['variantId']}',
+          saleKey(item),
           0,
           expectedQuantity: (item['quantity'] as num).toInt(),
         );
-        if (store!.cartItems.any((i) => i['variantId'] == item['variantId'])) {
+        if (store!.cartItems.any((i) => saleKey(i) == saleKey(item))) {
           paymentWarning = 'Đơn đã tạo. Giỏ hàng đã được thay đổi trên thiết bị khác và được giữ lại; hãy kiểm tra trước khi mua tiếp.';
         }
       } catch (_) {
@@ -319,11 +419,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 22),
+          SwitchListTile.adaptive(
+            title: const Text('Yêu cầu nhận tại cửa hàng'),
+            subtitle: Text(
+              pickup
+                  ? '${StoreContact.defaults['contactAddress']}\nCửa hàng sẽ xác nhận lịch nhận với bạn.'
+                  : 'Giao hàng đến địa chỉ của bạn',
+            ),
+            value: pickup,
+            onChanged: busy || submitted ? null : changeFulfillment,
+          ),
           Form(
             key: form,
             onChanged: invalidate,
             child: Column(
               children: [
+                TextFormField(
+                  controller: fields['invoiceEmail'],
+                  enabled: !busy && !submitted,
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (_) => invalidate(),
+                  decoration: const InputDecoration(
+                    labelText: 'Email nhận hóa đơn (tùy chọn)',
+                  ),
+                  validator: (v) =>
+                      (v ?? '').trim().isNotEmpty &&
+                          !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                              .hasMatch(v!.trim())
+                      ? 'Email chưa hợp lệ.'
+                      : null,
+                ),
+                const SizedBox(height: 16),
                 for (final entry in {
                   'receiverName': 'Người nhận',
                   'receiverPhone': 'Số điện thoại',
@@ -391,6 +517,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             entry.key == 'shippingAddress' && v.length > 500) {
                           return 'Nội dung quá dài.';
                         }
+                        if (entry.key == 'note' && orderNote().length > 5000) {
+                          return 'Ghi chú và email nhận hóa đơn tối đa 5.000 ký tự.';
+                        }
                         if (entry.key == 'points') {
                           final points = int.tryParse(v);
                           final limit = number(
@@ -413,6 +542,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
           ),
+          if (locationMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(locationMessage!),
+            ),
+          if (locating) const LinearProgressIndicator(),
           Wrap(
             spacing: 12,
             children: [
@@ -451,6 +586,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Panel(
               child: Column(
                 children: [
+                  for (final item in items) ...[
+                    Builder(
+                      builder: (context) {
+                        final row =
+                            objects(quote!['items'])
+                                .where((r) => saleKey(r) == saleKey(item))
+                                .firstOrNull ??
+                            store!.cartItems
+                                .where((r) => saleKey(r) == saleKey(item))
+                                .firstOrNull ??
+                            {};
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            '${row['productName'] ?? 'Sản phẩm đã chọn'} × ${item['quantity']}',
+                          ),
+                          subtitle: SaleExpiry(item['expiryDate']),
+                        );
+                      },
+                    ),
+                  ],
                   PriceSummary(quote!),
                   Text(
                     'Dự kiến tích ${quote!['estimatedEarnedPoints']} điểm khi đơn hoàn tất.',
@@ -477,7 +633,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           FilledButton.icon(
-            onPressed: busy
+            onPressed: busy || locating
                 ? null
                 : quote == null
                 ? preview

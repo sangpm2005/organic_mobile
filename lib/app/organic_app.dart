@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../shared/widgets/visible_refresh.dart';
+
 import 'dart:async';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,6 +13,7 @@ import 'package:organic_mobile/shared/theme/organic_theme.dart';
 import '../features/notifications/data/customer_push.dart';
 import '../features/notifications/data/push_gateway.dart';
 import '../features/orders/presentation/order_screen.dart';
+import '../features/orders/data/payment_return_links.dart';
 import '../features/feedback/presentation/feedback_detail_screen.dart';
 import '../features/returns/presentation/return_detail_screen.dart';
 import '../shared/widgets/session_boundary.dart';
@@ -27,11 +30,40 @@ class _OrganicAppState extends State<OrganicApp> {
   final messenger = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<PushEvent>? subscription;
   final seen = <String>{};
+  final paymentLinks = PaymentReturnLinks();
+  String? openingPayment;
   OrganicStore get store => widget.store;
   @override
   void initState() {
     super.initState();
     subscription = store.push.events.listen(receive);
+    unawaited(
+      paymentLinks.start((uri) {
+        final id = paymentReturnOrder(uri);
+        if (id == null || !mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || openingPayment == id) return;
+          if (!store.loggedIn) {
+            messenger.currentState?.showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Đăng nhập rồi mở Đơn hàng để xem kết quả thanh toán.',
+                ),
+              ),
+            );
+            return;
+          }
+          openingPayment = id;
+          navigator.currentState
+              ?.push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SessionBoundary(child: OrderScreen(id)),
+                ),
+              )
+              .whenComplete(() => openingPayment = null);
+        });
+      }),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pending = store.push.pendingOpen;
       if (mounted && pending != null) receive(pending);
@@ -83,6 +115,7 @@ class _OrganicAppState extends State<OrganicApp> {
   @override
   void dispose() {
     subscription?.cancel();
+    paymentLinks.dispose();
     super.dispose();
   }
 
@@ -90,6 +123,7 @@ class _OrganicAppState extends State<OrganicApp> {
   Widget build(BuildContext context) => StoreScope(
     store: store,
     child: MaterialApp(
+      navigatorObservers: [storefrontRoutes],
       navigatorKey: navigator,
       scaffoldMessengerKey: messenger,
       title: 'organicfood',

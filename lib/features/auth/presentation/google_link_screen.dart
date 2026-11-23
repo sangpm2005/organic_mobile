@@ -60,6 +60,8 @@ class _GoogleLinkScreenState extends State<GoogleLinkScreen> {
           obscureText: true,
           autocorrect: false,
           enableSuggestions: false,
+          enableIMEPersonalizedLearning: false,
+          keyboardType: TextInputType.visiblePassword,
           decoration: const InputDecoration(
             labelText: 'Mật khẩu hiện tại (nếu có)',
           ),

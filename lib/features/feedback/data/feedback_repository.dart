@@ -10,6 +10,7 @@ class FeedbackRepository {
     int page, {
     String? orderId,
     String? status,
+    String? feedbackType,
     String search = '',
   }) async => object(
     await api.request(
@@ -20,6 +21,7 @@ class FeedbackRepository {
         'size': 20,
         'orderId': orderId,
         'status': status,
+        'feedbackType': feedbackType,
         'search': search,
       },
     ),

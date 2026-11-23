@@ -10,6 +10,7 @@ import '../../../shared/navigation/navigation.dart';
 import '../../../shared/state/store_scope.dart';
 import '../../../shared/theme/organic_theme.dart';
 import '../../cart/data/cart_checkout_payload.dart';
+import '../../catalog/domain/sale_selection.dart';
 import '../domain/voucher_recommendation.dart';
 import 'widgets/voucher_card.dart';
 
@@ -71,7 +72,7 @@ class _VoucherPickerScreenState extends State<VoucherPickerScreen> {
           .map(
             (i) => {
               ...?store!.cartItems
-                  .where((r) => r['variantId'] == i['variantId'])
+                  .where((r) => saleKey(r) == saleKey(i))
                   .firstOrNull,
               ...i,
             },

@@ -5,6 +5,7 @@ Future<String?> askNote(
   String title, {
   String? description,
   bool required = true,
+  bool collectNote = true,
   int maxLength = 5000,
 }) async {
   final controller = TextEditingController();
@@ -24,20 +25,21 @@ Future<String?> askNote(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(description),
                 ),
-              TextFormField(
-                controller: controller,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: maxLength,
-                decoration: InputDecoration(
-                  labelText: required
-                      ? 'Nội dung / lý do *'
-                      : 'Ghi chú (không bắt buộc)',
+              if (collectNote)
+                TextFormField(
+                  controller: controller,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: maxLength,
+                  decoration: InputDecoration(
+                    labelText: required
+                        ? 'Nội dung / lý do *'
+                        : 'Ghi chú (không bắt buộc)',
+                  ),
+                  validator: (v) => required && (v?.trim().isEmpty ?? true)
+                      ? 'Vui lòng nhập nội dung.'
+                      : null,
                 ),
-                validator: (v) => required && (v?.trim().isEmpty ?? true)
-                    ? 'Vui lòng nhập nội dung.'
-                    : null,
-              ),
             ],
           ),
         ),
@@ -49,7 +51,7 @@ Future<String?> askNote(
         ),
         FilledButton(
           onPressed: () {
-            if (form.currentState!.validate()) {
+            if (!collectNote || form.currentState!.validate()) {
               Navigator.pop(ctx, controller.text.trim());
             }
           },

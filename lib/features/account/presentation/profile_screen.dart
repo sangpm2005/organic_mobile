@@ -38,6 +38,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  Future<void> chooseBirthday() async {
+    final now = DateUtils.dateOnly(DateTime.now());
+    final current = DateTime.tryParse(fields['dateOfBirth']!.text);
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      initialDate:
+          current != null && !current.isAfter(now) && current.year >= 1900
+          ? current
+          : DateTime(now.year - 20, now.month, now.day),
+      helpText: 'Chọn ngày sinh',
+    );
+    if (picked != null && mounted && !busy) {
+      fields['dateOfBirth']!.text = picked.toIso8601String().substring(0, 10);
+    }
+  }
+
   Future<void> save() async {
     if (!form.currentState!.validate()) {
       return;
@@ -90,7 +108,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 key: ValueKey('profile.${e.key}'),
                 controller: fields[e.key],
                 enabled: !busy,
-                decoration: InputDecoration(labelText: e.value),
+                keyboardType: e.key == 'phoneNumber'
+                    ? TextInputType.phone
+                    : e.key == 'email'
+                    ? TextInputType.emailAddress
+                    : TextInputType.text,
+                readOnly: e.key == 'dateOfBirth',
+                onTap: e.key == 'dateOfBirth' ? chooseBirthday : null,
+                decoration: InputDecoration(
+                  labelText: e.value,
+                  suffixIcon: e.key == 'dateOfBirth'
+                      ? IconButton(
+                          tooltip: 'Chọn ngày sinh',
+                          onPressed: busy ? null : chooseBirthday,
+                          icon: const Icon(Icons.calendar_month_outlined),
+                        )
+                      : null,
+                ),
                 validator: (v) {
                   if (e.key == 'fullName' && (v == null || v.trim().isEmpty)) {
                     return 'Nhập họ và tên.';

@@ -209,6 +209,11 @@ void main() {
         350,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Thử lại đơn này'),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Thử lại đơn này'));
       await tester.pumpAndSettle();
       expect(attempts, 1);

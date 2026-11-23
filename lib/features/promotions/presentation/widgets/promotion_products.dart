@@ -5,6 +5,10 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../shared/state/store_scope.dart';
 import '../../../../shared/navigation/navigation.dart';
 import '../../../catalog/presentation/product_screen.dart';
+import '../../../catalog/domain/sale_selection.dart';
+import '../../../catalog/domain/product_detail.dart';
+import '../../../catalog/presentation/widgets/sale_option_picker.dart';
+import '../../../../core/network/api_exception.dart';
 
 class PromotionProducts extends StatefulWidget {
   final Json offer;
@@ -16,6 +20,22 @@ class PromotionProducts extends StatefulWidget {
 class _PromotionProductsState extends State<PromotionProducts> {
   final Map<String, String> selected = {};
   bool busy = false;
+  bool stale = false;
+  String choiceKey(Json v) => saleKey({...v, 'variantId': v['id']});
+  Json? choice(Json p) =>
+      objects(p['variants'])
+          .where((v) => choiceKey(v) == selected['${p['productId']}'])
+          .firstOrNull;
+  bool enough(Json p) {
+    final v = choice(p);
+    if (v == null) return false;
+    final current = StoreScope.of(context).cartItems
+        .where((row) => saleKey(row) == choiceKey(v))
+        .fold<double>(0, (sum, row) => sum + number(row['quantity']));
+    return current + quantity(p) <= number(v['availableQuantity']) &&
+        current + quantity(p) <= 999;
+  }
+
   List<Json> get products => objects(widget.offer['products']);
   int quantity(Json p) => number(p['requiredQuantity']).toInt().clamp(1, 999);
   List<Json> available(Json p) =>
@@ -27,26 +47,34 @@ class _PromotionProductsState extends State<PromotionProducts> {
     super.initState();
     for (final p in products) {
       final v = available(p).firstOrNull;
-      if (v != null) selected['${p['productId']}'] = '${v['id']}';
+      if (v != null) selected['${p['productId']}'] = choiceKey(v);
     }
   }
 
   Future<void> add() async {
     final store = StoreScope.of(context);
-    if (busy) return;
+    if (busy || stale) return;
     setState(() => busy = true);
     try {
+      if (products.any((p) => !enough(p))) {
+        throw const ApiException(
+          'Chưa đủ hàng ở lựa chọn này. Hãy điều chỉnh giỏ hoặc chọn lại quy cách / hạn sử dụng.',
+        );
+      }
       await store.addBatch(
         products
             .map(
               (p) => {
-                'variantId': selected['${p['productId']}'],
+                'variantId': choice(p)!['id'],
                 'quantity': quantity(p),
+                ...saleFields(choice(p)),
               },
             )
             .toList(),
       );
-      store.selectPromotion('${widget.offer['promotionCode']}');
+      if (widget.offer['saleScope'] != 'expiry') {
+        store.selectPromotion('${widget.offer['promotionCode']}');
+      }
       if (mounted) {
         toast(
           context,
@@ -54,7 +82,10 @@ class _PromotionProductsState extends State<PromotionProducts> {
         );
       }
     } catch (e) {
-      if (mounted) toast(context, e);
+      if (mounted) {
+        toast(context, e);
+        if (e is ApiException && e.status == 409) setState(() => stale = true);
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -75,15 +106,23 @@ class _PromotionProductsState extends State<PromotionProducts> {
           ),
           if (combo && available(p).isNotEmpty)
             DropdownButtonFormField<String>(
-              initialValue: selected['${p['productId']}'],
+              key: ValueKey(
+                'combo.choice.${p['productId']}.${selected['${p['productId']}']}',
+              ),
+              initialValue:
+                  available(p)
+                      .any((v) => choiceKey(v) == selected['${p['productId']}'])
+                  ? selected['${p['productId']}']
+                  : null,
               isExpanded: true,
+              isDense: false,
+              itemHeight: null,
               items: available(p)
                   .map(
                     (v) => DropdownMenuItem(
-                      value: '${v['id']}',
+                      value: choiceKey(v),
                       child: Text(
-                        '${v['variantName']} · ${money(v['price'])}',
-                        overflow: TextOverflow.ellipsis,
+                        '${variantDisplayName(v)} · ${money(v['price'])}${v['expiryDate'] == null ? '' : '\nHSD: ${saleDate(v['expiryDate'])}'}',
                       ),
                     ),
                   )
@@ -92,6 +131,7 @@ class _PromotionProductsState extends State<PromotionProducts> {
                   ? null
                   : (v) => setState(() => selected['${p['productId']}'] = v!),
             ),
+          if (combo && choice(p) != null) SaleExpiry(choice(p)!['expiryDate']),
           if (combo && available(p).isEmpty)
             const Text('Chưa đủ hàng cho sản phẩm này.'),
         ],
@@ -99,11 +139,16 @@ class _PromotionProductsState extends State<PromotionProducts> {
           FilledButton(
             onPressed:
                 busy ||
+                    stale ||
                     products.isEmpty ||
-                    products.any((p) => available(p).isEmpty)
+                    products.any((p) => !enough(p))
                 ? null
                 : add,
             child: Text(busy ? 'Đang thêm…' : 'Thêm combo vào giỏ'),
+          ),
+        if (stale)
+          const Text(
+            'Ưu đãi hoặc tồn kho đã thay đổi. Vui lòng mở lại trang ưu đãi để tải dữ liệu mới.',
           ),
       ],
     );

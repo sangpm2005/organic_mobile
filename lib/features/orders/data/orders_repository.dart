@@ -5,6 +5,35 @@ import '../domain/payment_policy.dart';
 class OrdersRepository {
   final OrganicApi api;
   OrdersRepository(this.api);
+
+  /// The current API only paginates. Search must include older pages too.
+  Future<List<Json>> all() async {
+    final session = api.sessionVersion;
+    final rows = <String, Json>{};
+    for (var page = 0; ; page++) {
+      final result = object(
+        await api.request('GET', '/orders', query: {'page': page, 'size': 100}),
+      );
+      if (api.sessionVersion != session) {
+        throw StateError('Phiên đăng nhập đã thay đổi.');
+      }
+      final batch = pageItems(result);
+      final previous = rows.length;
+      for (final row in batch) {
+        rows['${row['id']}'] = row;
+      }
+      if (rows.length >= number(result['totalElements']) ||
+          (result['totalPages'] != null &&
+              page + 1 >= number(result['totalPages']))) {
+        break;
+      }
+      if (previous == rows.length) {
+        throw StateError('Danh sách đơn đã thay đổi. Vui lòng tìm lại.');
+      }
+    }
+    return rows.values.toList();
+  }
+
   Future<Json> detail(String id) async =>
       object(await api.request('GET', '/orders/${Uri.encodeComponent(id)}'));
 

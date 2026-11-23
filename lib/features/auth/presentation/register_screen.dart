@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
 import 'package:organic_mobile/shared/theme/organic_theme.dart';
@@ -26,6 +29,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   };
   bool otp = false, busy = false;
   String? error;
+  int resendSeconds = 0;
+  Timer? resendTimer;
+  void startCooldown() {
+    resendTimer?.cancel();
+    setState(() => resendSeconds = 60);
+    resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || resendSeconds <= 1) {
+        timer.cancel();
+      }
+      if (mounted) {
+        setState(() => resendSeconds = (resendSeconds - 1).clamp(0, 60));
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    resendTimer?.cancel();
     for (final c in fields.values) {
       c.dispose();
     }
@@ -41,6 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> submit({bool resend = false}) async {
+    if (busy || (resend && resendSeconds > 0)) return;
     if (resend &&
         !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
             .hasMatch(fields['email']!.text.trim())) {
@@ -64,6 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           body: {'email': fields['email']!.text.trim()},
         );
         if (mounted) {
+          startCooldown();
           toast(context, 'Đã yêu cầu gửi lại mã. Vui lòng kiểm tra email.');
         }
       } else if (otp) {
@@ -77,6 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
         );
         if (mounted) {
+          toast(context, 'Xác thực thành công. Bạn có thể đăng nhập.');
           Navigator.pop(context, true);
         }
       } else {
@@ -94,6 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         if (mounted) {
           setState(() => otp = true);
+          startCooldown();
         }
       }
     } catch (e) {
@@ -152,6 +175,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: TextFormField(
                     key: ValueKey('register.${entry.key}'),
                     autocorrect: false,
+                    enableSuggestions: entry.key == 'fullName',
+                    enableIMEPersonalizedLearning: entry.key == 'fullName',
+                    smartDashesType: entry.key == 'fullName'
+                        ? SmartDashesType.enabled
+                        : SmartDashesType.disabled,
+                    smartQuotesType: entry.key == 'fullName'
+                        ? SmartQuotesType.enabled
+                        : SmartQuotesType.disabled,
+                    inputFormatters: entry.key == 'otp'
+                        ? [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ]
+                        : null,
+                    autofillHints: entry.key == 'otp'
+                        ? const [AutofillHints.oneTimeCode]
+                        : null,
                     controller: fields[entry.key],
                     enabled: !busy,
                     obscureText: entry.key.toLowerCase().contains('password'),
@@ -159,7 +199,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ? TextInputType.emailAddress
                         : ['phoneNumber', 'otp'].contains(entry.key)
                         ? TextInputType.phone
-                        : TextInputType.text,
+                        : entry.key == 'fullName'
+                        ? TextInputType.text
+                        : TextInputType.visiblePassword,
                     decoration: InputDecoration(labelText: entry.value),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
@@ -168,6 +210,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (entry.key == 'email' &&
                           !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v)) {
                         return 'Email chưa hợp lệ.';
+                      }
+                      if (entry.key == 'otp' &&
+                          !RegExp(r'^\d{6}$').hasMatch(v)) {
+                        return 'Nhập đủ 6 chữ số trong mã OTP.';
                       }
                       if (entry.key == 'password' && v.length < 8) {
                         return 'Mật khẩu cần ít nhất 8 ký tự.';
@@ -211,8 +257,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         if (otp)
           TextButton(
-            onPressed: busy ? null : () => submit(resend: true),
-            child: const Text('Gửi lại mã OTP'),
+            onPressed: busy || resendSeconds > 0
+                ? null
+                : () => submit(resend: true),
+            child: Text(
+              resendSeconds > 0
+                  ? 'Gửi lại mã sau $resendSeconds giây'
+                  : 'Gửi lại mã OTP',
+            ),
           ),
       ],
     ),

@@ -38,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await StoreScope.of(context).login(username.text, password.text);
       if (mounted) {
+        toast(context, 'Đăng nhập thành công. Chào bạn trở lại!');
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -72,7 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
         toast(context, 'Bổ sung số điện thoại để hoàn tất hồ sơ khách hàng.');
         await open(context, const ProfileScreen());
       }
-      if (mounted && store.loggedIn) Navigator.pop(context, true);
+      if (mounted && store.loggedIn) {
+        toast(context, 'Đăng nhập Google thành công.');
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     } finally {
@@ -113,6 +117,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   key: const ValueKey('auth.username'),
                   autocorrect: false,
+                  enableSuggestions: false,
+                  enableIMEPersonalizedLearning: false,
+                  keyboardType: TextInputType.visiblePassword,
+                  textCapitalization: TextCapitalization.none,
+                  smartDashesType: SmartDashesType.disabled,
+                  smartQuotesType: SmartQuotesType.disabled,
                   controller: username,
                   enabled: !busy,
                   autofillHints: const [AutofillHints.username],
@@ -131,6 +141,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: password,
                   enabled: !busy,
                   obscureText: hidden,
+                  keyboardType: TextInputType.visiblePassword,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  enableIMEPersonalizedLearning: false,
+                  smartDashesType: SmartDashesType.disabled,
+                  smartQuotesType: SmartQuotesType.disabled,
                   autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
                     labelText: 'Mật khẩu',

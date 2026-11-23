@@ -4,6 +4,10 @@ import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/auth/presentation/widgets/login_gate.dart';
 import 'package:organic_mobile/features/catalog/presentation/widgets/product_photo.dart';
 import 'package:organic_mobile/features/catalog/domain/product_detail.dart';
+
+import '../../catalog/domain/sale_selection.dart';
+import '../../catalog/presentation/widgets/sale_option_picker.dart';
+
 import 'package:organic_mobile/features/checkout/presentation/checkout_screen.dart';
 import 'package:organic_mobile/shared/navigation/navigation.dart';
 import 'package:organic_mobile/shared/state/store_scope.dart';
@@ -68,7 +72,7 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> change(Json item, int quantity) async {
     setState(() => busy = true);
     try {
-      await StoreScope.of(context).quantity('${item['variantId']}', quantity);
+      await StoreScope.of(context).quantity(saleKey(item), quantity);
     } catch (e) {
       if (mounted) {
         toast(context, e);
@@ -138,6 +142,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ...store.cartItems.map(
             (item) => Padding(
+              key: ValueKey('cart.line.${saleKey(item)}'),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Panel(
                 padding: const EdgeInsets.all(12),
@@ -174,6 +179,7 @@ class _CartScreenState extends State<CartScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
+                              SaleExpiry(item['expiryDate']),
                               Text(
                                 money(item['unitPrice']),
                                 style: const TextStyle(
@@ -186,6 +192,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         IconButton(
                           tooltip: 'Bỏ sản phẩm khỏi giỏ',
+                          key: ValueKey('cart.remove.${saleKey(item)}'),
                           onPressed: busy ? null : () => change(item, 0),
                           icon: const Icon(Icons.close, size: 18),
                         ),
@@ -227,7 +234,14 @@ class _CartScreenState extends State<CartScreen> {
                             Text('${item['quantity']}'),
                             IconButton(
                               tooltip: 'Tăng số lượng',
-                              onPressed: busy || number(item['quantity']) >= 999
+                              key: ValueKey('cart.increase.${saleKey(item)}'),
+                              onPressed:
+                                  busy ||
+                                      item['available'] != true ||
+                                      number(item['quantity']) >= 999 ||
+                                      (item['availableQuantity'] != null &&
+                                          number(item['quantity']) >=
+                                              number(item['availableQuantity']))
                                   ? null
                                   : () => change(
                                       item,

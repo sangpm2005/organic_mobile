@@ -120,15 +120,8 @@ class _FeedbackComposerState extends State<FeedbackComposer> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.feedbackId == null) ...[
-          TextFormField(
-            controller: subject,
-            enabled: !busy && !saved && !uncertain,
-            maxLength: 200,
-            decoration: const InputDecoration(labelText: 'Chủ đề *'),
-            validator: (v) =>
-                (v?.trim().isEmpty ?? true) ? 'Vui lòng nhập chủ đề.' : null,
-          ),
           DropdownButtonFormField<String>(
+            key: const ValueKey('feedback.type'),
             initialValue: type,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Nội dung cần hỗ trợ'),
@@ -142,8 +135,47 @@ class _FeedbackComposerState extends State<FeedbackComposer> {
                 : (v) => setState(() => type = v!),
           ),
           const SizedBox(height: 16),
+          TextFormField(
+            key: const ValueKey('feedback.subject'),
+            controller: subject,
+            enabled: !busy && !saved && !uncertain,
+            maxLength: 200,
+            decoration: const InputDecoration(
+              labelText: 'Chủ đề *',
+              hintText: 'Nhập chủ đề hoặc chọn gợi ý bên dưới',
+            ),
+            validator: (v) =>
+                (v?.trim().isEmpty ?? true) ? 'Vui lòng nhập chủ đề.' : null,
+          ),
+          Text(
+            'Gợi ý chủ đề · Chạm để điền, bạn vẫn có thể sửa lại',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final suggestion in feedbackSubjectSuggestions[type]!)
+                ActionChip(
+                  label: Text(suggestion),
+                  onPressed: busy || saved || uncertain
+                      ? null
+                      : () {
+                          subject.value = TextEditingValue(
+                            text: suggestion,
+                            selection: TextSelection.collapsed(
+                              offset: suggestion.length,
+                            ),
+                          );
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
         ],
         TextFormField(
+          key: const ValueKey('feedback.content'),
           controller: content,
           enabled: !busy && !saved && !uncertain,
           minLines: 3,

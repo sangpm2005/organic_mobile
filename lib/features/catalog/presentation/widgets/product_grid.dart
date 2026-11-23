@@ -8,7 +8,7 @@ class ProductGrid extends StatelessWidget {
   const ProductGrid(this.products, {super.key, required this.onTap});
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (_, constraints) {
+    builder: (context, constraints) {
       final columns =
           constraints.maxWidth < 350 ||
               MediaQuery.textScalerOf(context).scale(12) > 18
@@ -16,6 +16,9 @@ class ProductGrid extends StatelessWidget {
           : constraints.maxWidth > 650
           ? 3
           : 2;
+      final cardWidth =
+          (constraints.maxWidth - 40 - 12 * (columns - 1)) / columns;
+      final layout = ProductTileLayout.measure(context, products, cardWidth);
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
@@ -23,24 +26,27 @@ class ProductGrid extends StatelessWidget {
             for (var start = 0; start < products.length; start += columns)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var offset = 0; offset < columns; offset++) ...[
-                      if (offset > 0) const SizedBox(width: 12),
-                      Expanded(
-                        child: start + offset >= products.length
-                            ? const SizedBox()
-                            : ProductTile(
-                                products[start + offset],
-                                key: ValueKey(
-                                  'product.tile.${products[start + offset].id}',
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var offset = 0; offset < columns; offset++) ...[
+                        if (offset > 0) const SizedBox(width: 12),
+                        Expanded(
+                          child: start + offset >= products.length
+                              ? const SizedBox()
+                              : ProductTile(
+                                  products[start + offset],
+                                  key: ValueKey(
+                                    'product.tile.${products[start + offset].id}',
+                                  ),
+                                  onTap: () => onTap(products[start + offset]),
+                                  layout: layout,
                                 ),
-                                onTap: () => onTap(products[start + offset]),
-                              ),
-                      ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
           ],

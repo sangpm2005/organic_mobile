@@ -41,6 +41,7 @@ class _ReturnDetailScreenState extends State<ReturnDetailScreen> {
       context,
       titles[action]!,
       required: action != 'accept',
+      collectNote: action != 'accept',
       description: action == 'accept'
           ? 'Bạn đồng ý phương án đang hiển thị. Cửa hàng sẽ tiếp tục xử lý; thao tác này chưa xác nhận bạn đã nhận tiền hoàn hoặc hàng đổi.'
           : null,

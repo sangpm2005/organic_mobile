@@ -26,6 +26,16 @@ Ba repo đang nằm cạnh nhau: `organic_mobile`, `organic_backend`, `organic_f
 
 ## Quy tắc giao dịch
 
+### Lựa chọn hàng theo hạn sử dụng
+
+- Mobile đọc `saleOptions` từ `/products/{id}/availability`, dùng giá, giá gốc và tồn kho của API. Chi tiết tự chọn một ưu đãi giảm trực tiếp còn hiệu lực, nếu không có thì gộp hàng thường để backend phân bổ FEFO. Không còn bộ chọn ngày. Một dòng “Hạn sử dụng” lấy từ `nearestExpiryDate` của hàng thường hoặc `expiryDate` của ưu đãi; không hiển thị ngày trên thẻ ở trang chủ/danh sách.
+- Định danh dòng giỏ là `selectionKey` (hoặc `variantId~expiryDate~salePromotionId`); giỏ cũ không có ngày vẫn dùng `variantId`. Thêm giỏ và checkout gửi `variantId`, `quantity`, `expiryDate`, `salePromotionId`. Tăng, giảm, xóa và dọn giỏ sau mua dùng đúng khóa lựa chọn, giữ điều kiện so sánh số lượng hiện tại.
+- Voucher preview giữ nguyên từng lựa chọn hạn dùng và ghép dữ liệu giỏ theo khóa đầy đủ. Checkout chặn quote làm mất/đổi hạn dùng hoặc chương trình đã yêu cầu. Đơn chờ do lỗi mạng giữ nguyên payload và idempotency key.
+- Combo theo hạn dùng có thể có nhiều lựa chọn cùng quy cách; mỗi lựa chọn có khóa riêng, hiển thị ngày của từng sản phẩm, gửi ngày và chương trình theo từng dòng. Không dùng mã khuyến mãi thường để thay cho `salePromotionId`.
+- Khi một ưu đãi hết, khám phá sản phẩm trở về hàng thường; giỏ/đơn cũ không được đổi ngày hoặc giá thay khách. Nút thêm nhanh đọc lại tồn; giá/chương trình vừa thay đổi thì mở chi tiết để khách kiểm tra, không tự gửi thêm giỏ.
+- Hàng thường gửi `variantId` và `quantity`, không gửi ngày chỉ dùng hiển thị thành điều kiện khóa lô. Giỏ có ngày từ phiên bản trước và combo vẫn giữ nguyên khóa đầy đủ. Chi tiết đơn hiển thị hạn dùng đã cam kết nếu có.
+- Kiểm tra thủ công: bật backend mới, xem hạn dùng ở chi tiết; xác nhận trang chủ/danh sách không có ngày. Đặt hết lượng ưu đãi rồi tải lại; giá/tồn của sản phẩm đổi về hàng thường, dòng giỏ ưu đãi cũ được kiểm tra độc lập. Không tự tạo đơn hay điều chỉnh tồn trong quá trình chạy test Flutter.
+
 - Đặt hàng và đổi voucher phải có `Idempotency-Key`. Khi timeout, lỗi mạng, 5xx, 408 hoặc 429, giữ nguyên key và payload. Không tự tạo yêu cầu mới khi chưa rõ kết quả.
 - Đổi voucher gửi `promotionId`, `expectedPointsCost`, `expectedOfferVersion` lấy từ ưu đãi hiện tại. Không suy ra giá trị/version ở client.
 - Có thể kết hợp mã khuyến mãi công khai với voucher. Voucher và trừ điểm trực tiếp loại trừ nhau. Quote phải trả đúng voucher yêu cầu và giảm giá dương trước khi xác nhận đơn.
@@ -59,3 +69,16 @@ Kiểm tra với tài khoản thật vẫn cần: giá/tồn kho hiện tại, v
 - Avatar dùng multipart `file`, đúng một ảnh JPEG/PNG/WebP ≤5 MB. Endpoint không thay đổi khi đổi tên cửa hàng.
 - Yêu thích lưu local theo tài khoản, backend hiện chưa có API để đồng bộ với website. Bản nháp đánh giá lưu phần chữ trong secure storage, ảnh chọn lại khi mở màn hình mới.
 - Tên hiển thị là `organicfood`; application ID, endpoint và khóa lưu phiên cũ được giữ để tương thích dữ liệu cài đặt trước.
+
+
+## Bổ sung UX ngày 07/11/2026
+
+- Không có migration SQL cho đợt này. Mobile dùng các endpoint đang có; không chỉnh `application.yml`.
+- `/feedbacks/me` gửi `search`, `feedbackType`, `status`, `page` và `size` để lọc và phân trang trên server.
+- `/orders` chưa có bộ lọc tìm kiếm: khi tìm/lọc, mobile đọc đủ các trang (100 bản ghi/yêu cầu), loại trùng theo ID và bỏ kết quả khi phiên thay đổi. Không coi trang đầu là toàn bộ lịch sử.
+- `/categories` đọc đủ các trang; hiển thị cây theo `parentId`. Lọc sản phẩm theo danh mục vẫn dùng `categoryId`, backend xử lý các danh mục con theo mặc định.
+- `/checkout/delivery-locations?address=...` chỉ được tự chọn nếu trả đúng một vị trí và `precise=true`. `/checkout/delivery-location-from-map` nhận liên kết; tọa độ nhập trực tiếp được kiểm tra khoảng vĩ/kinh độ rồi gửi trong payload thanh toán.
+- `/products/{id}/availability` là nguồn số khả dụng cho thẻ/chi tiết. Thẻ dùng cache 30 giây và tối đa ba yêu cầu đồng thời; trường không đọc được không tự chuyển thành một số tồn.
+- `/shopping-chat` nhận `message` tối đa 1.200 ký tự và tối đa tám lượt lịch sử, mỗi lượt tối đa 2.000 ký tự. Gửi token khi có phiên đăng nhập, không lưu hội thoại của tài khoản cũ khi đổi phiên; API không được dùng để sửa đơn.
+- `organicfood://payment-return?orderId=<UUID>` chỉ mở chi tiết đơn Android để tải và đối chiếu dữ liệu với server. Không ghi nhận đã trả tiền từ URL; không thay webhook/IPN. Trang trả về HTTPS và cấu hình cổng cần nối với URI này khi triển khai; xem `mobile-ux-completion-20261107.md`.
+- Nhận tại cửa hàng/email hóa đơn lưu thành yêu cầu trong `note` giống website, không thêm trường JSON ngoài hợp đồng. Payload và khóa thử lại đơn đang chờ được giữ nguyên.

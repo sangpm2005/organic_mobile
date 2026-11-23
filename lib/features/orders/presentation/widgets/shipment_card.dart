@@ -5,6 +5,7 @@ import '../../../../core/utils/json.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/widgets/panel.dart';
 import '../../domain/order_labels.dart';
+import 'delivery_estimate.dart';
 
 class ShipmentCard extends StatelessWidget {
   final Json shipment;
@@ -39,14 +40,7 @@ class ShipmentCard extends StatelessWidget {
               ),
             if (s['departedAt'] != null)
               Text('Khởi hành: ${dateText(s['departedAt'])}'),
-            if (s['estimatedArrivalAt'] != null && s['deliveredAt'] == null)
-              Text(
-                'Dự kiến đến: ${dateText(s['estimatedArrivalAt'])} (có thể thay đổi)',
-              ),
-            if (number(s['routeDistanceMeters']) > 0)
-              Text(
-                'Quãng đường dự kiến: ${(number(s['routeDistanceMeters']) / 1000).toStringAsFixed(1)} km',
-              ),
+            DeliveryEstimate(s),
             if (s['deliveredAt'] != null)
               Text('Đã giao: ${dateText(s['deliveredAt'])}'),
             if ('${s['failureReason'] ?? ''}'.isNotEmpty)

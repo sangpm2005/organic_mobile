@@ -127,6 +127,9 @@ class _RewardsScreenState extends State<RewardsScreen> {
                                         .titleLarge,
                                   ),
                                   Text(
+                                    'Tổng số dư: ${store.rewards?['balance'] ?? '—'} điểm',
+                                  ),
+                                  Text(
                                     'Đang giữ: ${store.rewards?['reserved'] ?? 0} điểm',
                                   ),
                                   Text(
@@ -161,7 +164,15 @@ class _RewardsScreenState extends State<RewardsScreen> {
                             title: Text(
                               '${t['note'] ?? const {'voucher_exchange': 'Đổi voucher', 'earn': 'Tích điểm', 'redeem': 'Trừ điểm', 'reserve': 'Giữ điểm', 'release': 'Hoàn điểm', 'return_restore': 'Hoàn điểm đổi trả', 'return_reverse': 'Điều chỉnh điểm'}[t['type']] ?? t['type']}',
                             ),
-                            subtitle: Text(dateText(t['createdAt'])),
+                            subtitle: Text(
+                              [
+                                dateText(t['createdAt']),
+                                if (number(t['reservedDelta']) != 0)
+                                  '${number(t['reservedDelta']) > 0 ? 'Giữ thêm' : 'Giải phóng'} ${number(t['reservedDelta']).abs().toInt()} điểm đang giữ',
+                                if (t['balanceAfter'] != null)
+                                  'Số dư sau giao dịch: ${t['balanceAfter']} điểm',
+                              ].join('\n'),
+                            ),
                             trailing: Text(
                               '${number(t['pointsDelta']) > 0 ? '+' : ''}${t['pointsDelta']}',
                             ),

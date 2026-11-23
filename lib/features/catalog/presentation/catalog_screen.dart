@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import '../../../shared/widgets/visible_refresh.dart';
+import 'widgets/category_picker.dart';
+
 import 'package:flutter/material.dart';
 import 'package:organic_mobile/app/state/organic_store.dart';
-import 'package:organic_mobile/core/utils/json.dart';
 import 'package:organic_mobile/features/catalog/domain/product.dart';
 import 'package:organic_mobile/features/catalog/presentation/product_screen.dart';
 import 'package:organic_mobile/features/catalog/presentation/widgets/product_grid.dart';
@@ -16,11 +18,13 @@ import 'package:organic_mobile/shared/widgets/heading.dart';
 class CatalogScreen extends StatefulWidget {
   final String? categoryId, title;
   final bool embedded;
+  final bool active;
   const CatalogScreen({
     super.key,
     this.categoryId,
     this.title,
     this.embedded = false,
+    this.active = true,
   });
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -47,11 +51,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  Future<void> load({int targetPage = 0}) async {
+  Future<void> load({int targetPage = 0, bool background = false}) async {
+    if (background && (busy || debounce?.isActive == true)) return;
     final version = ++requestVersion;
     final requestedPage = targetPage;
     setState(() {
-      busy = true;
+      if (!background) busy = true;
       error = null;
     });
     try {
@@ -72,10 +77,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
         total = result.total;
         pages = result.pages;
       });
-      if (scroll.hasClients) scroll.jumpTo(0);
+      if (!background && scroll.hasClients) scroll.jumpTo(0);
     } catch (e) {
       if (mounted && version == requestVersion) {
-        setState(() => error = '$e');
+        if (!background) setState(() => error = '$e');
       }
     } finally {
       if (mounted && version == requestVersion) {
@@ -120,36 +125,29 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: const Text('Tất cả'),
-                    selected: category == null,
-                    onSelected: (_) {
-                      category = null;
-                      load();
-                    },
-                  ),
-                ),
-                ...(store?.categories ?? <Json>[]).map(
-                  (c) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text('${c['name']}'),
-                      selected: category == c['id'],
-                      onSelected: (_) {
-                        category = '${c['id']}';
-                        load();
-                      },
-                    ),
-                  ),
-                ),
-              ],
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.account_tree_outlined),
+              label: Text(
+                category == null
+                    ? 'Tất cả danh mục'
+                    : '${store?.categories.where((c) => c['id'] == category).firstOrNull?['name'] ?? widget.title ?? 'Danh mục đã chọn'}',
+              ),
+              onPressed: () async {
+                try {
+                  await store!.loadCategories();
+                } catch (e) {
+                  if (context.mounted) toast(context, e);
+                  return;
+                }
+                if (!context.mounted) return;
+                final result = await chooseCategory(context, store!.categories);
+                if (result != null && mounted) {
+                  category = result['id']?.toString();
+                  load();
+                }
+              },
             ),
           ),
           Padding(
@@ -200,7 +198,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
           else if (!busy)
             ProductGrid(
               products,
-              onTap: (p) => open(context, ProductScreen(p.id)),
+              onTap: (p) =>
+                  open(context, ProductScreen(p.id, initialSale: p.sale)),
             ),
           if (busy)
             const Padding(
@@ -238,11 +237,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ],
       ),
     );
+    final refreshed = VisibleRefresh(
+      active: widget.active,
+      refresh: () => load(targetPage: page, background: true),
+      child: content,
+    );
     return widget.embedded
-        ? content
+        ? refreshed
         : Scaffold(
             appBar: AppBar(title: const Brand()),
-            body: content,
+            body: refreshed,
           );
   }
 }

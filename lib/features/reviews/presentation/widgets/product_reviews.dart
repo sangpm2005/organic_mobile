@@ -15,6 +15,7 @@ class ProductReviews extends StatefulWidget {
 
 class _ProductReviewsState extends State<ProductReviews> {
   List<Json> rows = [];
+  Json summary = {};
   int page = -1, total = 0;
   int? rating;
   String sort = 'newest';
@@ -53,6 +54,7 @@ class _ProductReviewsState extends State<ProductReviews> {
           result = object(data['reviews']);
       if (mounted) {
         setState(() {
+          summary = object(data['summary']);
           rows = reset ? pageItems(result) : [...rows, ...pageItems(result)];
           page = next;
           total = number(result['totalElements']).toInt();
@@ -69,6 +71,28 @@ class _ProductReviewsState extends State<ProductReviews> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      for (final item in objects(summary['distribution']))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              SizedBox(width: 52, child: Text('${item['rating']} sao')),
+              Expanded(
+                child: LinearProgressIndicator(
+                  value: number(summary['totalReviews']) <= 0
+                      ? 0
+                      : (number(item['count']) /
+                                number(summary['totalReviews']))
+                            .clamp(0, 1),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text('${item['count']}'),
+            ],
+          ),
+        ),
+      if (objects(summary['distribution']).isNotEmpty)
+        const SizedBox(height: 18),
       DropdownButtonFormField<int>(
         initialValue: rating ?? 0,
         isExpanded: true,

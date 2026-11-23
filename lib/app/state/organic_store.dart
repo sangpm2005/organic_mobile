@@ -9,6 +9,7 @@ import '../../core/network/organic_api.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/utils/json.dart';
 import '../../features/catalog/domain/product.dart';
+import '../../features/catalog/domain/sale_selection.dart';
 import '../../features/cart/data/cart_repository.dart';
 import '../../features/checkout/data/checkout_repository.dart';
 import '../../features/orders/data/orders_repository.dart';
@@ -56,6 +57,7 @@ class OrganicStore extends ChangeNotifier {
   bool hasMoreInbox = false, _active = true;
   Json? user, profile, cart, rewards, pendingCheckout;
   Json home = {};
+  List<Json> stockOffers = [];
   List<Json> categories = [];
   List<Json> orders = [], promotions = [], transactions = [];
   int _orderPage = 0;
@@ -104,7 +106,7 @@ class OrganicStore extends ChangeNotifier {
 
   List<Product> get discounted {
     final seen = <String>{};
-    return objects(home['discountedProducts'])
+    return [...stockOffers, ...objects(home['discountedProducts'])]
         .map(Product.fromJson)
         .where((p) => p.price > 0 && p.comparePrice > p.price && seen.add(p.id))
         .take(8)
@@ -274,23 +276,58 @@ class OrganicStore extends ChangeNotifier {
     home = object(await api.request('GET', '/home', authenticated: false));
     if (categories.isEmpty) categories = objects(home['categories']);
     notifyListeners();
-    try {
-      publicOffers = await promotionService.feed();
-      notifyListeners();
-    } catch (_) {
-      // Home/catalog remain usable if the optional offers feed is unavailable.
-    }
+    await Future.wait([
+      (() async {
+        try {
+          publicOffers = await promotionService.feed();
+          notifyListeners();
+        } catch (_) {
+          /* Keep the previous offers on a temporary failure. */
+        }
+      })(),
+      (() async {
+        try {
+          stockOffers = objects(
+            await api.request(
+              'GET',
+              '/home/discounted-stock',
+              authenticated: false,
+            ),
+          );
+          notifyListeners();
+        } catch (_) {
+          /* The primary home feed remains usable offline. */
+        }
+      })(),
+    ]);
   }
 
   Future<void> loadCategories() async {
-    categories = pageItems(
-      await api.request(
-        'GET',
-        '/categories',
-        authenticated: false,
-        query: {'size': 100},
-      ),
-    ).map((c) => {...c, 'name': c['categoryName'] ?? c['name']}).toList();
+    final rows = <String, Json>{};
+    for (var page = 0; ; page++) {
+      final result = object(
+        await api.request(
+          'GET',
+          '/categories',
+          authenticated: false,
+          query: {'page': page, 'size': 100},
+        ),
+      );
+      final batch = pageItems(result);
+      final previous = rows.length;
+      for (final c in batch) {
+        rows['${c['id']}'] = {...c, 'name': c['categoryName'] ?? c['name']};
+      }
+      if (rows.length >= number(result['totalElements']) ||
+          (result['totalPages'] != null &&
+              page + 1 >= number(result['totalPages']))) {
+        break;
+      }
+      if (previous == rows.length) {
+        throw StateError('Chưa tải đủ danh mục. Vui lòng thử lại.');
+      }
+    }
+    categories = rows.values.toList();
     notifyListeners();
   }
 
@@ -527,12 +564,13 @@ class OrganicStore extends ChangeNotifier {
     }
   }
 
-  Future<void> add(String variantId, int quantity) async {
+  Future<void> add(String variantId, int quantity, {Json? sale}) async {
     final generation = _generation, revision = ++_cartRevision;
     final result = object(
       await cartService.request('POST', '/items', {
         'variantId': variantId,
         'quantity': quantity,
+        ...saleFields(sale),
       }),
     );
     if (generation != _generation || revision != _cartRevision) {
@@ -584,7 +622,7 @@ class OrganicStore extends ChangeNotifier {
     final result = object(
       await cartService.request(
         value <= 0 ? 'DELETE' : 'PATCH',
-        '/items/$id',
+        '/items/${Uri.encodeComponent(id)}',
         value <= 0 ? null : {'quantity': value},
         expectedQuantity == null
             ? null

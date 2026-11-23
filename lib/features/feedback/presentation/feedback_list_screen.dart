@@ -20,7 +20,15 @@ class FeedbackListScreen extends StatefulWidget {
 }
 
 class _FeedbackListScreenState extends State<FeedbackListScreen> {
-  String? status;
+  String? status, feedbackType;
+  String search = '';
+  final searchController = TextEditingController();
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   int revision = 0;
   Future<void> compose() async {
     final id = await Navigator.of(context).push<String>(
@@ -69,15 +77,58 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
               'Đăng nhập để gửi phản hồi và trao đổi với cửa hàng.',
             )
           : PagedRecords(
-              key: ValueKey('${store.api.sessionVersion}:$status'),
+              key: ValueKey(store.api.sessionVersion),
               refreshToken: revision,
               load: (p) => store.feedbackService.list(
                 p,
                 orderId: widget.orderId,
                 status: status,
+                feedbackType: feedbackType,
+                search: search,
               ),
               empty: 'Chưa có phản hồi.',
               header: [
+                TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    labelText: 'Tìm mã hoặc chủ đề phản hồi',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: IconButton(
+                      tooltip: 'Tìm kiếm',
+                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: () => setState(() {
+                        search = searchController.text.trim();
+                        revision++;
+                      }),
+                    ),
+                  ),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (v) => setState(() {
+                    search = v.trim();
+                    revision++;
+                  }),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: '',
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Loại phản hồi'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Tất cả nội dung'),
+                    ),
+                    ...feedbackTypes.entries.map(
+                      (e) =>
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() {
+                    feedbackType = v == '' ? null : v;
+                    revision++;
+                  }),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: status ?? '',
                   isExpanded: true,
@@ -89,7 +140,10 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
                           DropdownMenuItem(value: e.key, child: Text(e.value)),
                     ),
                   ],
-                  onChanged: (v) => setState(() => status = v == '' ? null : v),
+                  onChanged: (v) => setState(() {
+                    status = v == '' ? null : v;
+                    revision++;
+                  }),
                 ),
                 const SizedBox(height: 16),
               ],

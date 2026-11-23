@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../shared/navigation/navigation.dart';
 
 import '../../../../core/utils/json.dart';
 import '../../../../shared/state/store_scope.dart';
@@ -24,10 +27,7 @@ class _DeliveryLocationPickerState extends State<DeliveryLocationPicker> {
       error = null;
     });
     try {
-      final isUrl = Uri.tryParse(text)?.hasScheme == true;
-      final found = isUrl
-          ? [await repository.fromMap(text)]
-          : await repository.locations(text);
+      final found = await repository.resolve(text);
       if (mounted) {
         setState(() {
           results = found;
@@ -59,7 +59,8 @@ class _DeliveryLocationPickerState extends State<DeliveryLocationPicker> {
           controller: input,
           maxLines: 3,
           decoration: const InputDecoration(
-            labelText: 'Địa chỉ hoặc liên kết Google Maps',
+            labelText: 'Địa chỉ, liên kết Google Maps hoặc tọa độ',
+            helperText: 'Ví dụ tọa độ: 10.7799129, 106.699902',
           ),
         ),
         const SizedBox(height: 12),
@@ -72,7 +73,28 @@ class _DeliveryLocationPickerState extends State<DeliveryLocationPicker> {
             error!,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
-        for (final place in results)
+        for (final place in results) ...[
+          TextButton.icon(
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Xem vị trí trên bản đồ'),
+            onPressed: () async {
+              final uri = Uri.https('www.google.com', '/maps/search/', {
+                'api': '1',
+                'query': '${place['latitude']},${place['longitude']}',
+              });
+              try {
+                if (await launchUrl(
+                  uri,
+                  mode: LaunchMode.externalApplication,
+                )) {
+                  return;
+                }
+              } catch (_) {}
+              if (context.mounted) {
+                toast(context, 'Chưa mở được bản đồ. Vui lòng thử lại.');
+              }
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.place_outlined),
             title: Text('${place['label']}'),
@@ -83,6 +105,7 @@ class _DeliveryLocationPickerState extends State<DeliveryLocationPicker> {
             ),
             onTap: () => Navigator.pop(context, place),
           ),
+        ],
       ],
     ),
   );

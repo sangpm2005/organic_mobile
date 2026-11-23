@@ -44,8 +44,14 @@ class _ShopShellState extends State<ShopShell> with WidgetsBindingObserver {
             child: IndexedStack(
               index: selected,
               children: [
-                HomeScreen(catalog: () => setState(() => selected = 1)),
-                const CatalogScreen(embedded: true),
+                TickerMode(
+                  enabled: selected == 0,
+                  child: HomeScreen(
+                    active: selected == 0,
+                    catalog: () => setState(() => selected = 1),
+                  ),
+                ),
+                CatalogScreen(embedded: true, active: selected == 1),
                 const CartScreen(),
                 const OrdersScreen(),
                 const AccountScreen(),

@@ -19,6 +19,7 @@ import 'package:organic_mobile/shared/widgets/panel.dart';
 import 'payment_launcher.dart';
 
 import '../../catalog/presentation/widgets/product_photo.dart';
+import '../../catalog/presentation/widgets/sale_option_picker.dart';
 import '../domain/payment_policy.dart';
 import '../../feedback/presentation/feedback_list_screen.dart';
 import '../../returns/presentation/returns_screen.dart';
@@ -202,6 +203,12 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
       );
       await load(force: true);
       if (!mounted || !store!.loggedIn) return;
+      if (mounted) {
+        toast(
+          context,
+          'Sau khi thanh toán, quay lại ứng dụng. Kết quả sẽ được cập nhật tự động.',
+        );
+      }
       await openPaymentPortal(payment);
     } catch (e) {
       if (mounted) {
@@ -308,8 +315,12 @@ class _OrderScreenState extends State<OrderScreen> with WidgetsBindingObserver {
                         child: ProductPhoto('${item['imageUrl'] ?? ''}'),
                       ),
                       title: Text('${item['productName']}'),
-                      subtitle: Text(
-                        '${item['variantName']} × ${item['quantity']}',
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${item['variantName']} × ${item['quantity']}'),
+                          SaleExpiry(item['expiryDate']),
+                        ],
                       ),
                       trailing: Text(money(item['lineAmount'])),
                     ),

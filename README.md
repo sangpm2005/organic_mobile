@@ -209,3 +209,6 @@ API ảnh/video và avatar cần cấu hình Cloudinary phía backend giống we
 ## Phần hoàn thiện ngày 06/11/2026
 
 Xem [đối chiếu yêu cầu và demo](docs/mobile-completion-20261106.md): đổi/quên mật khẩu OTP, sản phẩm giảm giá, chính sách trong app, đối chiếu thanh toán tự động và thông báo khách hàng. Không thay đổi backend hoặc SQL trong lần bổ sung mobile.
+
+
+Đợt bổ sung UX ngày 07/11/2026: xem [các chức năng mới, kiểm thử thủ công và cấu hình đường dẫn thanh toán](docs/mobile-ux-completion-20261107.md). Không cần thay đổi SQL cho đợt bổ sung này.

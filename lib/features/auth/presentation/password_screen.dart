@@ -182,6 +182,11 @@ class _PasswordScreenState extends State<PasswordScreen> {
                         controller: email,
                         enabled: !busy,
                         keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        enableIMEPersonalizedLearning: false,
+                        smartDashesType: SmartDashesType.disabled,
+                        smartQuotesType: SmartQuotesType.disabled,
                         autofillHints: const [AutofillHints.email],
                         decoration: const InputDecoration(
                           labelText: 'Email đăng ký',
@@ -236,6 +241,8 @@ class _PasswordScreenState extends State<PasswordScreen> {
                       obscureText: hidden,
                       autocorrect: false,
                       enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
+                      keyboardType: TextInputType.visiblePassword,
                       autofillHints: const [AutofillHints.newPassword],
                       decoration: InputDecoration(
                         labelText: 'Mật khẩu mới',
@@ -259,6 +266,8 @@ class _PasswordScreenState extends State<PasswordScreen> {
                       obscureText: hidden,
                       autocorrect: false,
                       enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
+                      keyboardType: TextInputType.visiblePassword,
                       decoration: const InputDecoration(
                         labelText: 'Nhập lại mật khẩu mới',
                       ),
