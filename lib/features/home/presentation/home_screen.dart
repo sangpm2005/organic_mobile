@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../shared/widgets/visible_refresh.dart';
 
 import 'widgets/home_banners.dart';
+import 'widgets/home_collections.dart';
+import '../../catalog/presentation/widgets/product_photo.dart';
 import '../domain/home_merchandising.dart';
 import '../../shopping_chat/presentation/shopping_chat_screen.dart';
 import '../../store_info/presentation/contact_screen.dart';
@@ -157,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Heading(
-                'Tươi lành mỗi ngày',
+                'Hôm nay, mình chọn gì?',
                 eyebrow: 'Ghé vườn nhà organicfood',
                 trailing: TextButton(
                   onPressed: widget.catalog,
@@ -199,15 +201,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  [
-                                    Icons.eco_outlined,
-                                    Icons.spa_outlined,
-                                    Icons.grain,
-                                    Icons.local_florist_outlined,
-                                  ][index % 4],
-                                  color: moss,
-                                  size: 24,
+                                ClipOval(
+                                  child: SizedBox(
+                                    width: 86,
+                                    height: 86,
+                                    child: ProductPhoto(
+                                      '${c['imageUrl'] ?? ''}',
+                                      height: 86,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
@@ -233,14 +235,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const Heading(
-                'organicfood chọn cho bạn',
-                eyebrow: 'Gợi ý mỗi ngày',
+                'Dành cho bữa ăn mỗi ngày',
+                eyebrow: 'Gợi ý từ cửa hàng',
               ),
-              ProductGrid(
-                store.featured,
-                onTap: (p) =>
-                    open(context, ProductScreen(p.id, initialSale: p.sale)),
-              ),
+              HomeCollections(home: store.home),
               if (store.discounted.isNotEmpty) ...[
                 const Heading(
                   'Chọn điều lành, thêm tiết kiệm',

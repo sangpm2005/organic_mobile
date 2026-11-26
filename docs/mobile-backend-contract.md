@@ -2,6 +2,14 @@
 
 Ba repo đang nằm cạnh nhau: `organic_mobile`, `organic_backend`, `organic_frontend`. Backend là nguồn dữ liệu dùng chung; mobile không sao chép toàn bộ màn hình website. Dữ liệu giỏ/đơn/voucher thuộc tài khoản CUSTOMER; không gửi customerId hoặc giá do client tự tính để quyết định giao dịch.
 
+## Đồng bộ giao diện cửa hàng ngày 26/11/2026
+
+- Banner ưu đãi trên trang chủ và combo trong chi tiết sản phẩm lướt mỗi 4 giây. Chạm phần nội dung một lần để chuyển, hai lần để mở đúng ưu đãi; có nút xem chi tiết riêng và hỗ trợ vuốt. Nút/ô nhập không bị thao tác chuyển slide chiếm sự kiện. Dừng tự chuyển khi đang chạm, app chạy nền, màn hình chi tiết khác đang mở hoặc bật giảm chuyển động.
+- Banner và chi tiết combo có ảnh sản phẩm, số lượng và giá tạm tính. Đổi quy cách sẽ tính lại tiền hàng, tiền giảm và tiền còn lại; áp dụng điều kiện đơn tối thiểu, giảm tối đa và không giảm quá tiền hàng. Không thay thế kết quả kiểm tra ở checkout.
+- Ảnh danh mục ưu tiên `imageUrl`, tiếp đến sản phẩm cùng danh mục trong `/home`; nếu thiếu thì lấy một sản phẩm qua `/products?categoryId=...&includeDescendants=false&size=1`. Lỗi ảnh không chặn trang chủ. Giữ tối đa 8 danh mục theo số sản phẩm và loại danh mục combo.
+- Trang chủ có các nhóm Còn hàng, Chọn lọc, Mới, Có chứng nhận và bộ lọc danh mục; khu sản phẩm giảm giá vẫn tách riêng. Hạn sử dụng vẫn chỉ hiện trong chi tiết, không thêm lên thẻ sản phẩm.
+- Không đổi API giao dịch, schema SQL hoặc cấu hình Firebase. Không đưa các màn hình phân quyền nhân viên của web quản trị vào ứng dụng khách hàng.
+
 | Luồng mobile | API dưới `/api/v1` | Tương ứng website |
 | --- | --- | --- |
 | Phiên, đăng ký OTP | `/auth/*` | AuthContext, trang đăng nhập/đăng ký |

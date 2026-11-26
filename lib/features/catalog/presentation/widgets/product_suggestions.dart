@@ -4,8 +4,7 @@ import '../../../../core/utils/json.dart';
 import '../../../../shared/state/store_scope.dart';
 import '../../../../shared/navigation/navigation.dart';
 import '../../../../shared/widgets/async_view.dart';
-import '../../../promotions/presentation/widgets/promotion_products.dart';
-import '../../../rewards/presentation/widgets/voucher_card.dart';
+import '../../../promotions/presentation/widgets/promotion_carousel.dart';
 import '../../domain/product.dart';
 import '../product_screen.dart';
 import 'product_grid.dart';
@@ -109,8 +108,7 @@ class ProductSuggestions extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
-            for (final offer in offers)
-              VoucherCard(offer, action: PromotionProducts(offer: offer)),
+            if (offers.isNotEmpty) PromotionCarousel(offers: offers),
           ],
         ),
       ),

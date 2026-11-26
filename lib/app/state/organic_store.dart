@@ -10,6 +10,7 @@ import '../../core/network/api_exception.dart';
 import '../../core/utils/json.dart';
 import '../../features/catalog/domain/product.dart';
 import '../../features/catalog/domain/sale_selection.dart';
+import '../../features/home/domain/home_merchandising.dart';
 import '../../features/cart/data/cart_repository.dart';
 import '../../features/checkout/data/checkout_repository.dart';
 import '../../features/orders/data/orders_repository.dart';
@@ -66,6 +67,7 @@ class OrganicStore extends ChangeNotifier {
   String? accountError;
   Timer? _timer;
   int _generation = 0, _cartRevision = 0;
+  int _homeLoadVersion = 0;
   int? _refreshGeneration;
   bool _disposed = false;
   Future<void> _pendingSave = Future.value();
@@ -273,13 +275,20 @@ class OrganicStore extends ChangeNotifier {
   }
 
   Future<void> loadHome() async {
-    home = object(await api.request('GET', '/home', authenticated: false));
+    final version = ++_homeLoadVersion;
+    final snapshot = object(
+      await api.request('GET', '/home', authenticated: false),
+    );
+    if (_disposed || version != _homeLoadVersion) return;
+    home = snapshot;
     if (categories.isEmpty) categories = objects(home['categories']);
     notifyListeners();
     await Future.wait([
       (() async {
         try {
-          publicOffers = await promotionService.feed();
+          final offers = await promotionService.feed();
+          if (_disposed || version != _homeLoadVersion) return;
+          publicOffers = offers;
           notifyListeners();
         } catch (_) {
           /* Keep the previous offers on a temporary failure. */
@@ -287,17 +296,40 @@ class OrganicStore extends ChangeNotifier {
       })(),
       (() async {
         try {
-          stockOffers = objects(
+          final offers = objects(
             await api.request(
               'GET',
               '/home/discounted-stock',
               authenticated: false,
             ),
           );
+          if (_disposed || version != _homeLoadVersion) return;
+          stockOffers = offers;
           notifyListeners();
         } catch (_) {
           /* The primary home feed remains usable offline. */
         }
+      })(),
+      (() async {
+        final images = await homeCategoryImages(
+          snapshot,
+          (categoryId) async => pageItems(
+            await api.request(
+              'GET',
+              '/products',
+              authenticated: false,
+              query: {
+                'categoryId': categoryId,
+                'includeDescendants': false,
+                'size': 1,
+                'page': 0,
+              },
+            ),
+          ),
+        );
+        if (_disposed || version != _homeLoadVersion) return;
+        home = {...snapshot, 'categories': images};
+        notifyListeners();
       })(),
     ]);
   }

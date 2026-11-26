@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/widgets/offer_carousel.dart';
 
-import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/json.dart';
 import '../../../../shared/navigation/navigation.dart';
 import '../../../../shared/theme/organic_theme.dart';
 import '../../../catalog/presentation/catalog_screen.dart';
 import '../../../promotions/presentation/promotions_screen.dart';
-import '../../../promotions/presentation/widgets/promotion_products.dart';
-import '../../../rewards/presentation/widgets/voucher_card.dart';
+import '../../../promotions/presentation/widgets/promotion_carousel.dart';
 import '../../../store_info/presentation/store_info_screen.dart';
 import '../../../store_info/presentation/contact_screen.dart';
 
@@ -20,87 +18,57 @@ class HomeBanners extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      OfferCarousel(
-        slides: [
-          for (final banner in banners)
-            _Banner(
-              title: '${banner['title'] ?? ''}',
-              subtitle: '${banner['subtitle'] ?? ''}',
-              image: '${banner['imageUrl'] ?? ''}',
-              label: '${banner['buttonLabel'] ?? 'Xem chi tiết'}',
-              onTap: () {
-                final path = Uri.tryParse('${banner['buttonHref']}')?.path;
-                final page = switch (path) {
-                  '/products' || '/san-pham' => const CatalogScreen(),
-                  '/promotions' || '/khuyen-mai' => const PromotionsScreen(),
-                  '/contact' || '/lien-he' => const ContactScreen(),
-                  '/about' ||
-                  '/about-store' ||
-                  '/traceability' ||
-                  '/ve-cua-hang' => const StoreInfoScreen(),
-                  _ => null,
-                };
-                if (page != null) {
-                  open(context, page);
-                } else {
-                  // Unknown web routes are presented as information, never opened as
-                  // arbitrary links or silently sent to an unrelated destination.
-                  open(
-                    context,
-                    Scaffold(
-                      appBar: AppBar(
-                        title: const Text('Chương trình từ cửa hàng'),
+      if (offers.isNotEmpty) PromotionCarousel(offers: offers),
+      if (banners.isNotEmpty)
+        OfferCarousel(
+          slides: [
+            for (final banner in banners)
+              _Banner(
+                title: '${banner['title'] ?? ''}',
+                subtitle: '${banner['subtitle'] ?? ''}',
+                image: '${banner['imageUrl'] ?? ''}',
+                label: '${banner['buttonLabel'] ?? 'Xem chi tiết'}',
+                onTap: () {
+                  final path = Uri.tryParse('${banner['buttonHref']}')?.path;
+                  final page = switch (path) {
+                    '/products' || '/san-pham' => const CatalogScreen(),
+                    '/promotions' || '/khuyen-mai' => const PromotionsScreen(),
+                    '/contact' || '/lien-he' => const ContactScreen(),
+                    '/about' ||
+                    '/about-store' ||
+                    '/traceability' ||
+                    '/ve-cua-hang' => const StoreInfoScreen(),
+                    _ => null,
+                  };
+                  if (page != null) {
+                    open(context, page);
+                  } else {
+                    // Unknown web routes are presented as information, never opened as
+                    // arbitrary links or silently sent to an unrelated destination.
+                    open(
+                      context,
+                      Scaffold(
+                        appBar: AppBar(
+                          title: const Text('Chương trình từ cửa hàng'),
+                        ),
+                        body: ListView(
+                          padding: const EdgeInsets.all(22),
+                          children: [
+                            Text(
+                              '${banner['title'] ?? ''}',
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 16),
+                            Text('${banner['subtitle'] ?? ''}'),
+                          ],
+                        ),
                       ),
-                      body: ListView(
-                        padding: const EdgeInsets.all(22),
-                        children: [
-                          Text(
-                            '${banner['title'] ?? ''}',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 16),
-                          Text('${banner['subtitle'] ?? ''}'),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          for (final offer in offers)
-            _Banner(
-              title: '${offer['name']}',
-              subtitle: [
-                offer['discountType'] == 'percentage'
-                    ? 'Giảm ${offer['discountValue']}%'
-                    : 'Giảm ${money(offer['discountValue'])}',
-                if (number(offer['minOrderValue']) > 0)
-                  'Đơn từ ${money(offer['minOrderValue'])}',
-                if ('${offer['description'] ?? ''}'.isNotEmpty)
-                  '${offer['description']}',
-                if (offer['endsAt'] != null) 'Đến ${dateText(offer['endsAt'])}',
-              ].join('\n'),
-              label: offer['promotionType'] == 'combo'
-                  ? 'Xem combo ưu đãi'
-                  : 'Xem chương trình',
-              onTap: () => open(
-                context,
-                Scaffold(
-                  appBar: AppBar(title: const Text('Chi tiết ưu đãi')),
-                  body: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      VoucherCard(
-                        offer,
-                        action: PromotionProducts(offer: offer),
-                      ),
-                    ],
-                  ),
-                ),
+                    );
+                  }
+                },
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
       if (offers.isNotEmpty)
         TextButton.icon(
           onPressed: () => open(context, const PromotionsScreen()),

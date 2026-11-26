@@ -9,6 +9,8 @@ import '../../../catalog/domain/sale_selection.dart';
 import '../../../catalog/domain/product_detail.dart';
 import '../../../catalog/presentation/widgets/sale_option_picker.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../catalog/presentation/widgets/product_photo.dart';
+import '../../domain/combo_pricing.dart';
 
 class PromotionProducts extends StatefulWidget {
   final Json offer;
@@ -94,16 +96,24 @@ class _PromotionProductsState extends State<PromotionProducts> {
   @override
   Widget build(BuildContext context) {
     final combo = widget.offer['promotionType'] == 'combo';
+    final estimate = combo ? comboEstimate(widget.offer, choice) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final p in products) ...[
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: ProductPhoto('${p['imageUrl'] ?? ''}', height: 140),
+          ),
           TextButton(
             onPressed: () => open(context, ProductScreen('${p['productId']}')),
             child: Text(
               '${p['productName']}${combo ? ' × ${quantity(p)}' : ''}',
             ),
           ),
+          if (choice(p)?['price'] != null)
+            Text('Đơn giá: ${money(choice(p)!['price'])}'),
           if (combo && available(p).isNotEmpty)
             DropdownButtonFormField<String>(
               key: ValueKey(
@@ -127,13 +137,33 @@ class _PromotionProductsState extends State<PromotionProducts> {
                     ),
                   )
                   .toList(),
-              onChanged: busy
+              onChanged: busy || stale
                   ? null
                   : (v) => setState(() => selected['${p['productId']}'] = v!),
             ),
           if (combo && choice(p) != null) SaleExpiry(choice(p)!['expiryDate']),
           if (combo && available(p).isEmpty)
             const Text('Chưa đủ hàng cho sản phẩm này.'),
+        ],
+        if (estimate != null) ...[
+          const Divider(height: 28),
+          const Text('Giá combo theo quy cách đã chọn'),
+          Text(
+            money(estimate.total),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (estimate.discount > 0) ...[
+            Text(
+              money(estimate.subtotal),
+              style: const TextStyle(decoration: TextDecoration.lineThrough),
+            ),
+            Text('Tiết kiệm ${money(estimate.discount)}'),
+          ],
+          const Text(
+            'Giá tạm tính cho một bộ. Ưu đãi được kiểm tra lại khi thanh toán.',
+            style: TextStyle(fontSize: 11),
+          ),
+          const SizedBox(height: 12),
         ],
         if (combo)
           FilledButton(
